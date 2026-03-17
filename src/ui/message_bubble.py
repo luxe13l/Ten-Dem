@@ -1,142 +1,132 @@
-# src/ui/message_bubble.py
-# -*- coding: utf-8 -*-
-
 """
-Кастомный виджет пузырька сообщения.
-Отображает одно сообщение с выравниванием в зависимости от отправителя,
-цветом фона, временем и статусом доставки/прочтения.
+Виджет пузырька сообщения
 """
+from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QPainter, QColor, QFont
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QFrame
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
-
-from models.message import Message
-from utils.settings import MY_MESSAGE_COLOR, OTHER_MESSAGE_COLOR
-from utils.helpers import format_time
+from src.models.message import Message
+from src.utils.settings import (
+    COLOR_MESSAGE_OWN, COLOR_MESSAGE_OTHER, COLOR_TEXT_PRIMARY,
+    COLOR_TEXT_SECONDARY, MESSAGE_BORDER_RADIUS, MESSAGE_PADDING_X,
+    MESSAGE_PADDING_Y, FONT_FAMILY, FONT_SIZE_MESSAGE, FONT_SIZE_TIME,
+    COLOR_TEXT_ON_ACCENT
+)
 
 
 class MessageBubble(QWidget):
-    """Виджет пузырька сообщения."""
-
-    def __init__(self, message: Message, is_self: bool, parent=None):
-        """
-        Инициализация пузырька.
-
-        Args:
-            message (Message): объект сообщения.
-            is_self (bool): True, если сообщение от текущего пользователя.
-            parent (QWidget, optional): родительский виджет.
-        """
+    """Виджет для отображения одного сообщения."""
+    
+    def __init__(self, message, is_self, parent=None):
         super().__init__(parent)
         self.message = message
         self.is_self = is_self
-
+        
+        self.padding_x = MESSAGE_PADDING_X
+        self.padding_y = MESSAGE_PADDING_Y
+        self.border_radius = MESSAGE_BORDER_RADIUS
+        self.max_width = 400
+        
         self.init_ui()
-
+    
     def init_ui(self):
-        """Создание интерфейса пузырька."""
-        # Основной горизонтальный layout для выравнивания всего блока
-        main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-
-        # Контейнер для пузырька (QFrame) - будет иметь фон и скругления
-        self.bubble_frame = QFrame()
-        self.bubble_frame.setMaximumWidth(500)  # ограничение ширины
-        self.bubble_frame.setSizePolicy(
-            QWidget.SizePolicy.Maximum,
-            QWidget.SizePolicy.Preferred
-        )
-
-        # Внутренний layout пузырька (текст + нижняя строка)
-        bubble_layout = QVBoxLayout(self.bubble_frame)
-        bubble_layout.setSpacing(4)
-        bubble_layout.setContentsMargins(12, 8, 12, 6)
-
-        # Текст сообщения
-        self.text_label = QLabel(self.message.text)
-        self.text_label.setWordWrap(True)
-        text_font = QFont()
-        text_font.setPointSize(14)
-        self.text_label.setFont(text_font)
-        bubble_layout.addWidget(self.text_label)
-
-        # Нижняя строка (время и статус)
-        bottom_layout = QHBoxLayout()
-        bottom_layout.setSpacing(4)
-
-        # Время
-        self.time_label = QLabel(format_time(self.message.timestamp))
-        time_font = QFont()
-        time_font.setPointSize(11)
-        self.time_label.setFont(time_font)
-        bottom_layout.addWidget(self.time_label)
-
-        # Статус (только для своих сообщений)
-        if self.is_self:
-            bottom_layout.addStretch()
-            self.status_label = QLabel(self.get_status_text())
-            status_font = QFont()
-            status_font.setPointSize(11)
-            self.status_label.setFont(status_font)
-            bottom_layout.addWidget(self.status_label)
-
-        bubble_layout.addLayout(bottom_layout)
-
-        # Применяем стили в зависимости от отправителя
-        self.apply_styles()
-
-        # Добавляем пузырёк в основной layout с соответствующим выравниванием
-        if self.is_self:
-            main_layout.addStretch()
-            main_layout.addWidget(self.bubble_frame)
-        else:
-            main_layout.addWidget(self.bubble_frame)
-            main_layout.addStretch()
-
-    def apply_styles(self):
-        """Применяет цвета и скругления в зависимости от is_self."""
-        if self.is_self:
-            bg_color = MY_MESSAGE_COLOR
-            text_color = "white"
-            time_color = "rgba(255, 255, 255, 0.7)"
-            status_color = "rgba(255, 255, 255, 0.7)"
-        else:
-            bg_color = OTHER_MESSAGE_COLOR
-            text_color = "#212529"
-            time_color = "#6C757D"
-            status_color = "#6C757D"
-
-        self.bubble_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {bg_color};
-                border-radius: 15px;
-            }}
-        """)
-
-        self.text_label.setStyleSheet(f"color: {text_color}; background: transparent;")
-        self.time_label.setStyleSheet(f"color: {time_color}; background: transparent;")
-
-        if self.is_self and hasattr(self, 'status_label'):
-            self.status_label.setStyleSheet(f"color: {status_color}; background: transparent;")
-
-    def get_status_text(self) -> str:
-        """
-        Возвращает текстовое представление статуса сообщения.
-        В реальном проекте можно использовать иконки или эмодзи.
-        """
-        if self.message.read:
-            return "✓✓"  # прочитано (две синие галочки)
-        elif self.message.delivered:
-            return "✓✓"  # доставлено (две серые галочки)
-        else:
-            return "✓"   # отправлено (одна серая галочка)
-
-    def update_message(self, message: Message):
-        """Обновляет содержимое пузырька (например, при изменении статуса)."""
-        self.message = message
-        self.text_label.setText(message.text)
-        self.time_label.setText(format_time(message.timestamp))
-        if self.is_self and hasattr(self, 'status_label'):
-            self.status_label.setText(self.get_status_text())
+        """Создаёт интерфейс пузырька."""
+        try:
+            layout = QVBoxLayout(self)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(2)
+            
+            self.text_label = QLabel(self.message.text)
+            self.text_label.setWordWrap(True)
+            self.text_label.setStyleSheet(f"""
+                color: {COLOR_TEXT_ON_ACCENT if self.is_self else COLOR_TEXT_PRIMARY};
+                font-size: {FONT_SIZE_MESSAGE}px;
+                font-family: {FONT_FAMILY};
+                padding: {self.padding_y}px {self.padding_x}px 2px;
+            """)
+            layout.addWidget(self.text_label)
+            
+            meta_layout = QHBoxLayout()
+            meta_layout.setContentsMargins(0, 0, self.padding_x, self.padding_y // 2)
+            
+            if not self.is_self:
+                meta_layout.addStretch()
+            
+            self.meta_label = QLabel()
+            self.update_meta()
+            self.meta_label.setStyleSheet(f"""
+                color: {COLOR_TEXT_ON_ACCENT if self.is_self else COLOR_TEXT_SECONDARY};
+                font-size: {FONT_SIZE_TIME}px;
+                font-family: {FONT_FAMILY};
+            """)
+            meta_layout.addWidget(self.meta_label)
+            
+            if self.is_self:
+                meta_layout.addStretch()
+            
+            layout.addLayout(meta_layout)
+            
+            self.setAlignment(Qt.AlignmentFlag.AlignRight if self.is_self else Qt.AlignmentFlag.AlignLeft)
+            self.update_style()
+            
+        except Exception as e:
+            print(f"Ошибка инициализации пузырька: {e}")
+    
+    def update_style(self):
+        """Обновляет стиль."""
+        try:
+            if self.is_self:
+                self.setStyleSheet(f"""
+                    QWidget {{
+                        background-color: {COLOR_MESSAGE_OWN};
+                        border-radius: {self.border_radius}px;
+                        margin-left: 60px;
+                    }}
+                """)
+            else:
+                self.setStyleSheet(f"""
+                    QWidget {{
+                        background-color: {COLOR_MESSAGE_OTHER};
+                        border-radius: {self.border_radius}px;
+                        margin-right: 60px;
+                    }}
+                """)
+        except Exception:
+            pass
+    
+    def update_meta(self):
+        """Обновляет время и статус."""
+        try:
+            status_icon = self.message.get_status_icon(self.is_self)
+            self.meta_label.setText(f"{self.message.format_time()} {status_icon}")
+        except Exception:
+            pass
+    
+    def sizeHint(self):
+        """Вычисляет предпочтительный размер."""
+        try:
+            text_width = self.text_label.sizeHint().width()
+            width = min(text_width + self.padding_x * 2, self.max_width)
+            height = self.text_label.sizeHint().height() + 30
+            
+            return QSize(width, height)
+        except Exception:
+            return QSize(200, 50)
+    
+    def paintEvent(self, event):
+        """Кастомная отрисовка."""
+        try:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            
+            if self.is_self:
+                painter.setBrush(QColor(COLOR_MESSAGE_OWN))
+            else:
+                painter.setBrush(QColor(COLOR_MESSAGE_OTHER))
+            
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(self.rect(), self.border_radius, self.border_radius)
+            
+            super().paintEvent(event)
+        except Exception:
+            super().paintEvent(event)

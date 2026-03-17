@@ -1,31 +1,53 @@
-# -*- coding: utf-8 -*-
 """
-Настройки приложения: цвета, размеры, пути.
+Константы и настройки приложения Ten Dem
 """
-
 import os
 
-# Приложение
-APP_NAME = "Ten Dem Messenger"
-ORGANIZATION_NAME = "TenDem"
+# === ЦВЕТА ===
+COLOR_PRIMARY = "#2481CC"
+COLOR_SECONDARY = "#6c5ce7"
+COLOR_BACKGROUND = "#F8F9FA"
+COLOR_PANEL = "#FFFFFF"
+COLOR_MESSAGE_OWN = "#2481CC"
+COLOR_MESSAGE_OTHER = "#E9ECEF"
+COLOR_TEXT_PRIMARY = "#212529"
+COLOR_TEXT_SECONDARY = "#6C757D"
+COLOR_TEXT_ON_ACCENT = "#FFFFFF"
+COLOR_DIVIDER = "#DEE2E6"
+COLOR_ACCENT = "#2481CC"
+COLOR_ACCENT_HOVER = "#1E6BA8"
+COLOR_ONLINE = "#28A745"
+COLOR_UNREAD_BADGE = "#DC3545"
+COLOR_ERROR = "#DC3545"
+COLOR_INPUT_BG = "#FFFFFF"
+COLOR_INPUT_BORDER = "#CED4DA"
 
-# Цвета
-MY_MESSAGE_COLOR = "#2481CC"
-OTHER_MESSAGE_COLOR = "#F1F3F5"
-MY_TEXT_COLOR = "#FFFFFF"
-OTHER_TEXT_COLOR = "#212529"
-SECONDARY_TEXT = "#6C757D"
-DIVIDER_COLOR = "#E9ECEF"
-BACKGROUND_MAIN = "#F8F9FA"
-BACKGROUND_PANEL = "#FFFFFF"
+# === РАЗМЕРЫ ===
+AVATAR_SIZE_MAIN = 50
+AVATAR_SIZE_CHAT = 40
+AVATAR_SIZE_SETTINGS = 80
+MESSAGE_BORDER_RADIUS = 18
+BUTTON_BORDER_RADIUS = 12
+INPUT_BORDER_RADIUS = 24
+MESSAGE_PADDING_X = 14
+MESSAGE_PADDING_Y = 10
+SPACING_SMALL = 5
+SPACING_NORMAL = 16
+SPACING_LARGE = 24
 
-# Размеры
-AVATAR_SIZE = 50
-MESSAGE_FONT_SIZE = 14
-MESSAGE_BORDER_RADIUS = 15
+# === ШРИФТЫ ===
+FONT_FAMILY = "Segoe UI, Arial, sans-serif"
+FONT_SIZE_NAME = 16
+FONT_SIZE_MESSAGE = 15
+FONT_SIZE_TIME = 11
+FONT_SIZE_INPUT = 14
 
-# Пути
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-ASSETS_DIR = os.path.join(BASE_DIR, "assets")
-ICONS_DIR = os.path.join(ASSETS_DIR, "icons")
-STYLES_DIR = os.path.join(ASSETS_DIR, "styles")
+# === ПУТИ ===
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+FIREBASE_KEY_PATH = os.path.join(BASE_DIR, 'firebase-key.json')
+ASSETS_DIR = os.path.join(BASE_DIR, 'assets')
+ICONS_PATH = os.path.join(ASSETS_DIR, 'icons')
+
+# === НАЗВАНИЯ ===
+APP_NAME = "Ten Dem"
+VERSION = "1.0.0"

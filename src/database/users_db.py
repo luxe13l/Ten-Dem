@@ -1,73 +1,105 @@
-# -*- coding: utf-8 -*-
+"""
+Модуль работы с пользователями в Firebase Firestore
+"""
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from database.firebase_client import get_db
-from models.user import User
+from src.database.firebase_client import get_db
 
-class UsersDB:
-    @staticmethod
-    def get_user(uid: str) -> Optional[User]:
-        db = get_db()
-        doc = db.collection('users').document(uid).get()
-        if doc.exists:
-            data = doc.to_dict()
-            data['uid'] = doc.id
-            return User.from_dict(data)
-        return None
 
-    @staticmethod
-    def get_user_by_phone(phone: str) -> Optional[User]:
+def get_user_by_phone(phone):
+    """Получает пользователя по номеру телефона."""
+    try:
         db = get_db()
-        docs = db.collection('users').where('phone', '==', phone).limit(1).stream()
+        if db is None:
+            return None
+        
+        users_ref = db.collection('users')
+        query = users_ref.where('phone', '==', phone).limit(1)
+        docs = query.stream()
+        
         for doc in docs:
-            data = doc.to_dict()
-            data['uid'] = doc.id
-            return User.from_dict(data)
+            return {'uid': doc.id, **doc.to_dict()}
+        
+        return None
+        
+    except Exception as e:
+        print(f"Ошибка получения пользователя: {e}")
         return None
 
-    @staticmethod
-    def get_user_by_name(name: str) -> Optional[User]:
-        db = get_db()
-        docs = db.collection('users').where('name', '==', name).limit(1).stream()
-        for doc in docs:
-            data = doc.to_dict()
-            data['uid'] = doc.id
-            return User.from_dict(data)
-        return None
 
-    @staticmethod
-    def create_user(user_data: Dict[str, Any]) -> str:
+def create_user(user_data):
+    """Создаёт нового пользователя в базе."""
+    try:
         db = get_db()
-        default_data = {
-            'phone': '',
-            'name': '',
-            'avatar_url': '',
-            'status': 'offline',
-            'last_seen': datetime.now(),
-            'created_at': datetime.now()
-        }
-        data_to_save = {**default_data, **user_data}
-        doc_ref = db.collection('users').add(data_to_save)
+        if db is None:
+            return ""
+        
+        users_ref = db.collection('users')
+        doc_ref = users_ref.add(user_data)
+        
         return doc_ref[1].id
+        
+    except Exception as e:
+        print(f"Ошибка создания пользователя: {e}")
+        return ""
 
-    @staticmethod
-    def update_user(uid: str, data: Dict[str, Any]) -> None:
+
+def update_user(uid, data):
+    """Обновляет данные пользователя."""
+    try:
         db = get_db()
-        db.collection('users').document(uid).update(data)
+        if db is None:
+            return False
+        
+        # Проверяем существование документа перед обновлением
+        users_ref = db.collection('users')
+        doc = users_ref.document(uid).get()
+        
+        if not doc.exists:
+            print(f"Предупреждение: документ {uid} не найден, создаём новый")
+            # Создаём новый документ с данными
+            new_data = {**data, 'uid': uid}
+            users_ref.document(uid).set(new_data)
+            return True
+        
+        users_ref.document(uid).update(data)
+        return True
+        
+    except Exception as e:
+        print(f"Ошибка обновления пользователя: {e}")
+        return False
 
-    @staticmethod
-    def get_all_users(exclude_uid: Optional[str] = None) -> List[User]:
+
+def get_all_users():
+    """Получает список всех пользователей."""
+    try:
         db = get_db()
-        users = []
-        docs = db.collection('users').stream()
-        for doc in docs:
-            if exclude_uid and doc.id == exclude_uid:
-                continue
-            data = doc.to_dict()
-            data['uid'] = doc.id
-            users.append(User.from_dict(data))
-        return users
+        if db is None:
+            return []
+        
+        users_ref = db.collection('users')
+        docs = users_ref.stream()
+        
+        return [{'uid': doc.id, **doc.to_dict()} for doc in docs]
+        
+    except Exception as e:
+        print(f"Ошибка получения списка пользователей: {e}")
+        return []
 
-    @staticmethod
-    def set_online_status(uid: str, status: str) -> None:
-        UsersDB.update_user(uid, {'status': status, 'last_seen': datetime.now()})
+
+def set_online_status(uid, status):
+    """Устанавливает статус онлайн/оффлайн."""
+    try:
+        db = get_db()
+        if db is None:
+            return False
+        
+        data = {
+            'status': status,
+            'last_seen': datetime.now()
+        }
+        
+        return update_user(uid, data)
+        
+    except Exception as e:
+        print(f"Ошибка обновления статуса: {e}")
+        return False

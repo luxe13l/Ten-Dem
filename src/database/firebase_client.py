@@ -1,72 +1,52 @@
-# -*- coding: utf-8 -*-
 """
-Модуль инициализации Firebase Admin SDK.
-Предоставляет функции для получения клиента Firestore.
+Модуль инициализации Firebase для мессенджера Ten Dem
 """
-
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore
-from typing import Optional
-
-# Глобальные переменные для хранения состояния
-_initialized: bool = False
-_db: Optional[firestore.Client] = None
 
 
-def init_firebase() -> firestore.Client:
-    """
-    Инициализирует Firebase Admin SDK, используя файл ключа service account.
+_db_client = None
 
-    Файл ключа должен называться 'firebase-key.json' и находиться в корневой папке проекта
-    (рядом с main.py). Если файл не найден или ключ неверен, выбрасывается исключение.
 
-    Возвращает:
-        firestore.Client: клиент Firestore.
-
-    Исключения:
-        FileNotFoundError: если файл ключа не найден.
-        Exception: при ошибках инициализации Firebase.
-    """
-    global _initialized, _db
-    if _initialized:
-        return _db
-
-    # Определяем путь к корню проекта (где лежит main.py)
-    # Текущий файл: src/database/firebase_client.py
-    current_dir = os.path.dirname(os.path.abspath(__file__))          # src/database
-    src_dir = os.path.dirname(current_dir)                            # src
-    project_root = os.path.dirname(src_dir)                           # корень проекта
-    key_path = os.path.join(project_root, 'firebase-key.json')
-
-    if not os.path.exists(key_path):
-        raise FileNotFoundError(
-            f"Файл ключа Firebase не найден: {key_path}\n"
-            "Убедитесь, что файл firebase-key.json находится в папке с программой."
-        )
-
+def init_firebase():
+    """Инициализирует Firebase Admin SDK."""
+    global _db_client
+    
     try:
-        cred = credentials.Certificate(key_path)
-        firebase_admin.initialize_app(cred)
-        _db = firestore.client()
-        _initialized = True
-        return _db
+        key_path = os.path.join(os.path.dirname(__file__), '..', '..', 'firebase-key.json')
+        key_path = os.path.abspath(key_path)
+        
+        print(f"Поиск ключа Firebase: {key_path}")
+        
+        if not os.path.exists(key_path):
+            print(f"ОШИБКА: файл ключа Firebase не найден: {key_path}")
+            print("Поместите firebase-key.json в корень проекта")
+            return None
+        
+        if not firebase_admin._apps:
+            cred = credentials.Certificate(key_path)
+            firebase_admin.initialize_app(cred)
+            print("Firebase успешно инициализирован")
+        
+        _db_client = firestore.client()
+        return _db_client
+        
+    except FileNotFoundError as e:
+        print(f"Ошибка: файл ключа не найден - {e}")
+        return None
     except Exception as e:
-        # Перехватываем любые ошибки Firebase (неверный формат ключа, проблемы с сетью и т.д.)
-        raise Exception(f"Ошибка инициализации Firebase: {e}")
+        print(f"Ошибка инициализации Firebase: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 
-def get_db() -> firestore.Client:
-    """
-    Возвращает клиент Firestore. Если Firebase ещё не инициализирован,
-    автоматически вызывает init_firebase().
-
-    Возвращает:
-        firestore.Client: клиент Firestore.
-
-    Исключения:
-        Exception: если не удалось инициализировать Firebase.
-    """
-    if not _initialized:
-        return init_firebase()
-    return _db
+def get_db():
+    """Возвращает клиент Firestore."""
+    global _db_client
+    
+    if _db_client is None:
+        _db_client = init_firebase()
+    
+    return _db_client
