@@ -1,154 +1,77 @@
 """
 Менеджер тем оформления для Ten Dem
 """
+from PyQt6.QtCore import QObject, pyqtSignal
+from src.utils.settings import LIGHT_THEME
 
 
-class ThemeManager:
+class ThemeManager(QObject):
     """Управление темами приложения."""
     
-    # Тёмная тема (по умолчанию)
-    DARK_THEME = {
-        'background': '#0F0F12',
-        'panel': '#1A1B1E',
-        'input_bg': '#25262B',
-        'input_border': '#3C3E44',
-        'input_focus': '#6C5CE7',
-        'text_primary': '#FFFFFF',
-        'text_secondary': '#9A9CA5',
-        'text_placeholder': '#5D5F67',
-        'accent': '#6C5CE7',
-        'accent_hover': '#5A4EC7',
-        'error': '#FF4757',
-        'success': '#2ED573',
-        'message_own': '#6C5CE7',
-        'message_other': '#25262B',
-    }
-    
-    # Светлая тема
-    LIGHT_THEME = {
-        'background': '#F5F7FA',
-        'panel': '#FFFFFF',
-        'input_bg': '#F0F2F5',
-        'input_border': '#D1D5DB',
-        'input_focus': '#6C5CE7',
-        'text_primary': '#1A1B1E',
-        'text_secondary': '#6B7280',
-        'text_placeholder': '#9CA3AF',
-        'accent': '#6C5CE7',
-        'accent_hover': '#5A4EC7',
-        'error': '#DC3545',
-        'success': '#10B981',
-        'message_own': '#6C5CE7',
-        'message_other': '#E5E7EB',
-    }
+    theme_changed = pyqtSignal(str)  # Сигнал при смене темы
     
     def __init__(self):
+        super().__init__()
         self.current_theme = 'dark'
-        self.colors = self.DARK_THEME.copy()
+        self.colors = self._get_dark_theme()
     
-    def set_theme(self, theme_name):
+    def _get_dark_theme(self):
+        """Возвращает цвета тёмной темы."""
+        from src.utils.settings import (
+            BG_PRIMARY, BG_SECONDARY, BG_TERTIARY,
+            ACCENT_PRIMARY, ACCENT_HOVER, ACCENT_PRESSED,
+            TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
+            MESSAGE_OWN_BG, MESSAGE_OTHER_BG,
+            ONLINE, OFFLINE, DIVIDER, INPUT_BORDER, INPUT_BORDER_FOCUS,
+            ICON_DEFAULT, ICON_HOVER, ICON_ACTIVE,
+            SUCCESS, ERROR, WARNING, READ_CHECK, DELIVERED_CHECK
+        )
+        
+        return {
+            'bg_primary': BG_PRIMARY,
+            'bg_secondary': BG_SECONDARY,
+            'bg_tertiary': BG_TERTIARY,
+            'accent_primary': ACCENT_PRIMARY,
+            'accent_hover': ACCENT_HOVER,
+            'accent_pressed': ACCENT_PRESSED,
+            'text_primary': TEXT_PRIMARY,
+            'text_secondary': TEXT_SECONDARY,
+            'text_tertiary': TEXT_TERTIARY,
+            'message_own_bg': MESSAGE_OWN_BG,
+            'message_other_bg': MESSAGE_OTHER_BG,
+            'online': ONLINE,
+            'offline': OFFLINE,
+            'divider': DIVIDER,
+            'input_border': INPUT_BORDER,
+            'input_border_focus': INPUT_BORDER_FOCUS,
+            'icon_default': ICON_DEFAULT,
+            'icon_hover': ICON_HOVER,
+            'icon_active': ICON_ACTIVE,
+            'success': SUCCESS,
+            'error': ERROR,
+            'warning': WARNING,
+            'read_check': READ_CHECK,
+            'delivered_check': DELIVERED_CHECK,
+        }
+    
+    def set_theme(self, theme_name: str):
         """Устанавливает тему."""
         if theme_name == 'light':
             self.current_theme = 'light'
-            self.colors = self.LIGHT_THEME.copy()
+            self.colors = LIGHT_THEME.copy()
         else:
             self.current_theme = 'dark'
-            self.colors = self.DARK_THEME.copy()
+            self.colors = self._get_dark_theme()
+        
+        self.theme_changed.emit(self.current_theme)
     
-    def get_color(self, name):
+    def get_color(self, name: str) -> str:
         """Получает цвет по имени."""
         return self.colors.get(name, '#000000')
     
-    def get_stylesheet(self, widget_type):
-        """Получает QSS для типа виджета."""
-        c = self.colors
-        
-        if widget_type == 'input':
-            return f"""
-                QLineEdit {{
-                    background-color: {c['input_bg']};
-                    color: {c['text_primary']};
-                    border: 1px solid {c['input_border']};
-                    border-radius: 16px;
-                    padding: 16px 20px;
-                    font-size: 18px;
-                    font-family: Segoe UI, Arial, sans-serif;
-                }}
-                QLineEdit:focus {{
-                    border: 2px solid {c['input_focus']};
-                }}
-                QLineEdit::placeholder {{
-                    color: {c['text_placeholder']};
-                }}
-            """
-        
-        elif widget_type == 'button_primary':
-            return f"""
-                QPushButton {{
-                    background-color: {c['accent']};
-                    color: white;
-                    border: none;
-                    border-radius: 14px;
-                    padding: 16px 32px;
-                    font-size: 16px;
-                    font-weight: bold;
-                    font-family: Segoe UI, Arial, sans-serif;
-                }}
-                QPushButton:hover {{
-                    background-color: {c['accent_hover']};
-                }}
-                QPushButton:disabled {{
-                    background-color: {c['text_placeholder']};
-                    color: {c['text_secondary']};
-                }}
-            """
-        
-        elif widget_type == 'button_secondary':
-            return f"""
-                QPushButton {{
-                    background-color: transparent;
-                    color: {c['text_secondary']};
-                    border: 1px solid {c['input_border']};
-                    border-radius: 14px;
-                    padding: 14px 28px;
-                    font-size: 14px;
-                    font-family: Segoe UI, Arial, sans-serif;
-                }}
-                QPushButton:hover {{
-                    background-color: {c['input_bg']};
-                    color: {c['text_primary']};
-                }}
-            """
-        
-        elif widget_type == 'label_title':
-            return f"""
-                QLabel {{
-                    color: {c['text_primary']};
-                    font-size: 24px;
-                    font-weight: bold;
-                    font-family: Segoe UI, Arial, sans-serif;
-                }}
-            """
-        
-        elif widget_type == 'label_subtitle':
-            return f"""
-                QLabel {{
-                    color: {c['text_secondary']};
-                    font-size: 14px;
-                    font-family: Segoe UI, Arial, sans-serif;
-                }}
-            """
-        
-        elif widget_type == 'label_error':
-            return f"""
-                QLabel {{
-                    color: {c['error']};
-                    font-size: 13px;
-                    font-family: Segoe UI, Arial, sans-serif;
-                }}
-            """
-        
-        return ""
+    def is_dark(self) -> bool:
+        """Проверяет, тёмная ли тема."""
+        return self.current_theme == 'dark'
 
 
 # Глобальный экземпляр

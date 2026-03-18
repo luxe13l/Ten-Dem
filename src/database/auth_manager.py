@@ -11,6 +11,7 @@ class AuthManager:
     def __init__(self):
         self.db = get_db()
         self.current_user = None
+        self._temp_codes = {}  # Временное хранилище кодов
     
     def send_verification_code(self, phone):
         """
@@ -23,17 +24,12 @@ class AuthManager:
             tuple: (success: bool, message: str, verification_id: str)
         """
         try:
-            # В РЕАЛЬНОМ ПРОЕКТЕ: Firebase Authentication SMS
-            # from firebase_auth import send_sms_code
-            # verification_id = send_sms_code(phone)
-            
             # ДЛЯ ТЕСТА: генерируем код
             import random
             code = str(random.randint(100000, 999999))
             verification_id = f"test_{phone}_{datetime.now().timestamp()}"
             
-            # Сохраняем код во временное хранилище (в памяти для теста)
-            self._temp_codes = getattr(self, '_temp_codes', {})
+            # Сохраняем код во временное хранилище
             self._temp_codes[verification_id] = {
                 'phone': phone,
                 'code': code,
@@ -59,12 +55,6 @@ class AuthManager:
             tuple: (success: bool, message: str, phone: str)
         """
         try:
-            # В РЕАЛЬНОМ ПРОЕКТЕ: Firebase Authentication
-            # result = firebase_auth.verify_code(verification_id, code)
-            
-            # ДЛЯ ТЕСТА: проверяем из временного хранилища
-            self._temp_codes = getattr(self, '_temp_codes', {})
-            
             if verification_id not in self._temp_codes:
                 return False, "Неверный код верификации", ""
             
@@ -101,17 +91,22 @@ class AuthManager:
         """
         try:
             if not self.db:
-                return True
+                return True  # Если нет БД — считаем свободным
             
             users_ref = self.db.collection('users')
+            
+            # Запрос к Firebase
             query = users_ref.where('username', '==', username).limit(1)
             docs = query.stream()
             
-            return len(list(docs)) == 0
+            # Проверяем есть ли результаты
+            result = len(list(docs)) == 0
+            
+            return result
             
         except Exception as e:
             print(f"Ошибка проверки username: {e}")
-            return True
+            return True  # При ошибке считаем свободным
     
     def create_user_profile(self, phone, name, surname, username):
         """

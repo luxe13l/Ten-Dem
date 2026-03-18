@@ -9,91 +9,38 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from PyQt6.QtWidgets import QApplication
 from src.database.firebase_client import init_firebase
 from src.ui.registration_wizard import RegistrationWizard
+from src.ui.main_window import MainWindow
+
+
+# ✅ ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ (чтобы окно не удалилось)
+main_window_ref = None
 
 
 def main():
     print("=== ЗАПУСК TEN DEM ===")
     
     try:
-        # Инициализация Firebase
         print("1. Инициализация Firebase...")
         init_firebase()
         
-        # Создание приложения
         print("2. Создание QApplication...")
         app = QApplication(sys.argv)
         app.setApplicationName("Ten Dem")
         app.setStyle("Fusion")
         
-        # Глобальный стиль - тёмная тема
         app.setStyleSheet("""
             QMainWindow, QDialog, QWidget {
                 background-color: #0F0F12;
                 color: #FFFFFF;
                 font-family: 'Segoe UI', Arial, sans-serif;
             }
-            QLineEdit, QTextEdit {
-                background-color: #25262B;
-                color: #FFFFFF;
-                border: 1px solid #3C3E44;
-                border-radius: 12px;
-                padding: 12px 16px;
-                font-size: 15px;
-                selection-background-color: #6C5CE7;
-                selection-color: #FFFFFF;
-            }
-            QLineEdit:focus, QTextEdit:focus {
-                border: 2px solid #6C5CE7;
-            }
-            QPushButton {
-                background-color: #6C5CE7;
-                color: #FFFFFF;
-                border: none;
-                border-radius: 12px;
-                padding: 14px 28px;
-                font-size: 15px;
-                font-weight: 600;
-                font-family: 'Segoe UI', Arial, sans-serif;
-            }
-            QPushButton:hover {
-                background-color: #5A4EC7;
-            }
-            QPushButton:pressed {
-                background-color: #4A3FB8;
-            }
-            QPushButton:disabled {
-                background-color: #2A2B30;
-                color: #5D5F67;
-            }
-            QLabel {
-                color: #FFFFFF;
-                font-family: 'Segoe UI', Arial, sans-serif;
-            }
-            QScrollArea {
-                border: none;
-                background-color: transparent;
-            }
-            QScrollBar:vertical {
-                background-color: #1A1B1E;
-                width: 8px;
-                border-radius: 4px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #3C3E44;
-                border-radius: 4px;
-                min-height: 20px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: #6C5CE7;
-            }
         """)
         
-        # Создание мастера регистрации
         print("3. Создание окна регистрации...")
         wizard = RegistrationWizard()
-        wizard.registration_complete.connect(lambda data: on_registration_complete(data, wizard))
+        wizard.registration_complete.connect(lambda data: on_registration_complete(data, wizard, app))
         
-        print("4. Показ окна...")
+        print("4. Показ окна регистрации...")
         wizard.show()
         
         print("5. Запуск...")
@@ -107,11 +54,49 @@ def main():
         sys.exit(1)
 
 
-def on_registration_complete(data, wizard):
-    """Обработка завершения регистрации."""
+def on_registration_complete(data, wizard, app):
+    """Обработка завершения регистрации/входа"""
+    global main_window_ref
+    
     print(f"✅ Регистрация завершена: {data}")
-    # Здесь будет создание главного окна
-    wizard.close()
+    
+    try:
+        # Закрываем окно регистрации
+        wizard.close()
+        wizard.deleteLater()
+        
+        # Создаём объект User из данных
+        from src.models.user import User
+        current_user = User(
+            uid=data.get('uid', ''),
+            phone=data.get('phone', ''),
+            name=data.get('name', '')
+        )
+        
+        print("6. Создание главного окна мессенджера...")
+        
+        # ✅ СОЗДАЁМ главное окно
+        main_window_ref = MainWindow(current_user)
+        
+        print("7. Показ главного окна...")
+        main_window_ref.show()
+        main_window_ref.raise_()
+        main_window_ref.activateWindow()
+        
+        # ✅ ПРОВЕРКА ПОСЛЕ show()
+        print(f"✅ Окно видно ПОСЛЕ show(): {main_window_ref.isVisible()}")
+        print(f"✅ Размер окна: {main_window_ref.size()}")
+        
+        # ✅ Загружаем контакты ПОСЛЕ показа окна (не блокирует UI)
+        print("8. Загрузка контактов...")
+        main_window_ref.load_contacts()
+        
+        print("✅ Мессенджер запущен!")
+        
+    except Exception as e:
+        print(f"❌ Ошибка создания MainWindow: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
