@@ -1,9 +1,6 @@
-"""
-Окно авторизации мессенджера Ten Dem
-"""
 import re
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, 
-                             QPushButton, QLabel, QMessageBox, QApplication)
+                             QPushButton, QLabel, QApplication)
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
@@ -17,8 +14,6 @@ from src.utils.settings import (
 
 
 class LoginWindow(QDialog):
-    """Окно входа в мессенджер."""
-    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.current_user = None
@@ -28,17 +23,21 @@ class LoginWindow(QDialog):
         self.init_ui()
         
     def init_ui(self):
-        """Инициализация интерфейса."""
         try:
             self.setWindowTitle("Вход — Ten Dem")
             self.setMinimumSize(400, 450)
-            self.setModal(True)
+            self.setModal(True)  # ✅ МОДАЛЬНОЕ
+            
+            # Центрирование
+            screen = QApplication.primaryScreen().geometry()
+            x = (screen.width() - 400) // 2
+            y = (screen.height() - 450) // 2
+            self.move(x, y)
             
             layout = QVBoxLayout()
             layout.setSpacing(20)
             layout.setContentsMargins(40, 40, 40, 40)
             
-            # Заголовок
             title = QLabel("Ten Dem")
             title.setFont(QFont(FONT_FAMILY, 24, QFont.Weight.Bold))
             title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -52,7 +51,6 @@ class LoginWindow(QDialog):
             
             layout.addSpacing(20)
             
-            # Поле телефона
             self.phone_input = QLineEdit()
             self.phone_input.setPlaceholderText("+7 (999) 999-99-99")
             self.phone_input.textChanged.connect(self.format_phone_input)
@@ -66,13 +64,9 @@ class LoginWindow(QDialog):
                     font-size: 15px;
                     font-family: {FONT_FAMILY};
                 }}
-                QLineEdit:focus {{
-                    border: 2px solid {COLOR_ACCENT};
-                }}
             """)
             layout.addWidget(self.phone_input)
             
-            # Кнопка получения кода
             self.code_btn = QPushButton("Получить код")
             self.code_btn.setStyleSheet(f"""
                 QPushButton {{
@@ -85,18 +79,10 @@ class LoginWindow(QDialog):
                     font-family: {FONT_FAMILY};
                     font-weight: bold;
                 }}
-                QPushButton:hover {{
-                    background-color: #1E6BA8;
-                }}
-                QPushButton:disabled {{
-                    background-color: {COLOR_INPUT_BORDER};
-                    color: {COLOR_TEXT_SECONDARY};
-                }}
             """)
             self.code_btn.clicked.connect(self.send_code)
             layout.addWidget(self.code_btn)
             
-            # Поле кода
             self.code_input = QLineEdit()
             self.code_input.setPlaceholderText("Введите код из СМС")
             self.code_input.setVisible(False)
@@ -114,7 +100,6 @@ class LoginWindow(QDialog):
             """)
             layout.addWidget(self.code_input)
             
-            # Кнопка входа
             self.login_btn = QPushButton("Войти")
             self.login_btn.setVisible(False)
             self.login_btn.setStyleSheet(f"""
@@ -128,14 +113,10 @@ class LoginWindow(QDialog):
                     font-family: {FONT_FAMILY};
                     font-weight: bold;
                 }}
-                QPushButton:hover {{
-                    background-color: #1E6BA8;
-                }}
             """)
             self.login_btn.clicked.connect(self.verify_code)
             layout.addWidget(self.login_btn)
             
-            # Кнопка пропуска
             self.skip_btn = QPushButton("Пропустить (тест)")
             self.skip_btn.setStyleSheet(f"""
                 QPushButton {{
@@ -147,14 +128,10 @@ class LoginWindow(QDialog):
                     font-size: 14px;
                     font-family: {FONT_FAMILY};
                 }}
-                QPushButton:hover {{
-                    background-color: {COLOR_PANEL};
-                }}
             """)
             self.skip_btn.clicked.connect(self.skip_login)
             layout.addWidget(self.skip_btn)
             
-            # Сообщение об ошибке
             self.error_label = QLabel()
             self.error_label.setStyleSheet(f"color: {COLOR_ERROR}; font-size: 13px;")
             self.error_label.setWordWrap(True)
@@ -162,25 +139,21 @@ class LoginWindow(QDialog):
             
             self.setLayout(layout)
             
-            # Таймер
             self.timer.setInterval(1000)
             self.timer.timeout.connect(self.update_timer)
             
         except Exception as e:
-            print(f"Ошибка инициализации окна входа: {e}")
+            print(f"Ошибка init_ui: {e}")
             import traceback
             traceback.print_exc()
     
     def format_phone_input(self, text):
-        """Форматирует ввод номера телефона."""
         try:
             digits = re.sub(r'\D', '', text)
-            
             if digits.startswith('8'):
                 digits = '7' + digits[1:]
             if not digits.startswith('7'):
                 digits = '7' + digits
-            
             digits = digits[:11]
             
             if len(digits) <= 1:
@@ -201,10 +174,8 @@ class LoginWindow(QDialog):
             pass
     
     def send_code(self):
-        """Отправляет код подтверждения."""
         try:
             phone = re.sub(r'\D', '', self.phone_input.text())
-            
             if len(phone) != 11:
                 self.error_label.setText("Введите корректный номер")
                 return
@@ -223,10 +194,8 @@ class LoginWindow(QDialog):
             self.error_label.setText(f"Ошибка: {e}")
     
     def update_timer(self):
-        """Обновляет таймер кнопки."""
         try:
             self.seconds_left -= 1
-            
             if self.seconds_left > 0:
                 self.code_btn.setText(f"Отправить код повторно ({self.seconds_left}с)")
             else:
@@ -237,21 +206,20 @@ class LoginWindow(QDialog):
             pass
     
     def verify_code(self):
-        """Проверяет код и входит."""
         try:
             code = self.code_input.text().strip()
-            
             if len(code) != 6:
                 self.error_label.setText("Код должен содержать 6 цифр")
                 return
             
             phone = re.sub(r'\D', '', self.phone_input.text())
             
+            # ✅ ПРАВИЛЬНО: user_data (полное имя)
             user_data = get_user_by_phone(phone)
             
-            # ИСПРАВЛЕНО: было "if user_" без завершения
-            if user_data:
+            if user_data:  # ✅ ПРАВИЛЬНО: user_data, НЕ user_
                 self.current_user = User.from_dict(user_data, user_data['uid'])
+                print(f"Пользователь найден: {self.current_user.name}")
             else:
                 from datetime import datetime
                 new_uid = create_user({
@@ -267,27 +235,33 @@ class LoginWindow(QDialog):
                         name=f"Пользователь {phone[-4:]}",
                         status='online'
                     )
+                    print(f"Пользователь создан: {self.current_user.name}")
             
             if self.current_user:
-                self.accept()
+                print("✅ Вход успешен, закрываем с кодом 1")
+                self.accept()  # ✅ Возвращает 1
             else:
-                self.error_label.setText("Ошибка входа. Попробуйте ещё раз.")
+                self.error_label.setText("Ошибка входа")
         except Exception as e:
+            print(f"Ошибка verify_code: {e}")
             self.error_label.setText(f"Ошибка: {e}")
     
     def skip_login(self):
-        """Создаёт тестового пользователя."""
         try:
+            from datetime import datetime
             self.current_user = User(
-                uid="test_user",
+                uid="test_user_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
                 phone="+79990000000",
                 name="Тестовый пользователь",
-                status="online"
+                status="online",
+                last_seen=datetime.now()
             )
-            self.accept()
+            print(f"✅ Тестовый пользователь: {self.current_user.name}")
+            print("✅ Закрываем окно с кодом 1")
+            self.accept()  # ✅ ВОЗВРАЩАЕТ 1 (не done(1), не reject())
         except Exception as e:
-            print(f"Ошибка при пропуске входа: {e}")
+            print(f"Ошибка skip_login: {e}")
+            self.error_label.setText(f"Ошибка: {e}")
     
     def get_user(self):
-        """Возвращает авторизованного пользователя."""
         return self.current_user

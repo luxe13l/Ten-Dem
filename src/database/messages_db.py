@@ -7,9 +7,7 @@ from src.database.firebase_client import get_db
 
 
 def send_message(from_uid, to_uid, text):
-    """
-    Отправляет сообщение между пользователями.
-    """
+    """Отправляет сообщение между пользователями."""
     try:
         db = get_db()
         if db is None:
@@ -35,9 +33,7 @@ def send_message(from_uid, to_uid, text):
 
 
 def get_messages(uid1, uid2, limit=50):
-    """
-    Получает историю переписки между двумя пользователями.
-    """
+    """Получает историю переписки."""
     try:
         db = get_db()
         if db is None:
@@ -45,22 +41,24 @@ def get_messages(uid1, uid2, limit=50):
         
         messages_ref = db.collection('messages')
         
-        query = messages_ref.where(
-            'from_uid', 'in', [uid1, uid2]
-        ).where(
-            'to_uid', 'in', [uid1, uid2]
-        ).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(limit)
+        query1 = messages_ref.where('from_uid', '==', uid1).where('to_uid', '==', uid2).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(limit)
+        query2 = messages_ref.where('from_uid', '==', uid2).where('to_uid', '==', uid1).order_by('timestamp', direction=firestore.Query.DESCENDING).limit(limit)
         
-        docs = query.stream()
         messages = []
         
-        for doc in docs:
+        for doc in query1.stream():
+            msg_data = doc.to_dict()
+            if 'timestamp' in msg_data and hasattr(msg_data['timestamp'], 'to_pydatetime'):
+                msg_data['timestamp'] = msg_data['timestamp'].to_pydatetime()
+            messages.append({'id': doc.id, **msg_data})
+            
+        for doc in query2.stream():
             msg_data = doc.to_dict()
             if 'timestamp' in msg_data and hasattr(msg_data['timestamp'], 'to_pydatetime'):
                 msg_data['timestamp'] = msg_data['timestamp'].to_pydatetime()
             messages.append({'id': doc.id, **msg_data})
         
-        return sorted(messages, key=lambda x: x['timestamp'])
+        return sorted(messages, key=lambda x: x['timestamp'], reverse=True)[:limit]
         
     except Exception as e:
         print(f"Ошибка получения сообщений: {e}")
@@ -68,9 +66,7 @@ def get_messages(uid1, uid2, limit=50):
 
 
 def listen_for_messages(user_uid, callback):
-    """
-    Подписывается на новые сообщения для пользователя.
-    """
+    """Подписывается на новые сообщения."""
     try:
         db = get_db()
         if db is None:
@@ -95,9 +91,7 @@ def listen_for_messages(user_uid, callback):
 
 
 def mark_as_read(message_id):
-    """
-    Отмечает сообщение как прочитанное.
-    """
+    """Отмечает сообщение как прочитанное."""
     try:
         db = get_db()
         if db is None:
@@ -111,9 +105,7 @@ def mark_as_read(message_id):
 
 
 def mark_as_delivered(message_id):
-    """
-    Отмечает сообщение как доставленное.
-    """
+    """Отмечает сообщение как доставленное."""
     try:
         db = get_db()
         if db is None:
@@ -127,9 +119,7 @@ def mark_as_delivered(message_id):
 
 
 def get_unread_count(user_uid):
-    """
-    Получает количество непрочитанных сообщений.
-    """
+    """Получает количество непрочитанных сообщений."""
     try:
         db = get_db()
         if db is None:
@@ -146,9 +136,7 @@ def get_unread_count(user_uid):
 
 
 def mark_chat_as_read(user_uid, contact_uid):
-    """
-    Отмечает все сообщения от контакта как прочитанные.
-    """
+    """Отмечает все сообщения от контакта как прочитанные."""
     try:
         db = get_db()
         if db is None:

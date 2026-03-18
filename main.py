@@ -3,68 +3,115 @@
 """
 import sys
 import os
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt
 
-# Добавляем корень проекта в путь импорта
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from src.ui.login_window import LoginWindow
-from src.ui.main_window import MainWindow
+from PyQt6.QtWidgets import QApplication
 from src.database.firebase_client import init_firebase
-from src.utils.settings import COLOR_BACKGROUND, COLOR_TEXT_PRIMARY
+from src.ui.registration_wizard import RegistrationWizard
 
 
 def main():
-    """Запуск приложения."""
+    print("=== ЗАПУСК TEN DEM ===")
+    
     try:
         # Инициализация Firebase
-        print("Инициализация Firebase...")
+        print("1. Инициализация Firebase...")
         init_firebase()
         
-        # Создаём приложение
-        print("Создание приложения...")
+        # Создание приложения
+        print("2. Создание QApplication...")
         app = QApplication(sys.argv)
         app.setApplicationName("Ten Dem")
         app.setStyle("Fusion")
         
-        # Устанавливаем глобальный стиль
-        app.setStyleSheet(f"""
-            QMainWindow, QDialog, QWidget {{
-                background-color: {COLOR_BACKGROUND};
-                color: {COLOR_TEXT_PRIMARY};
-                font-family: Segoe UI, Arial, sans-serif;
-            }}
-            QLineEdit, QTextEdit {{
-                color: {COLOR_TEXT_PRIMARY};
-                selection-background-color: #2481CC;
-                selection-color: white;
-            }}
-            QPushButton {{
-                color: white;
-            }}
+        # Глобальный стиль - тёмная тема
+        app.setStyleSheet("""
+            QMainWindow, QDialog, QWidget {
+                background-color: #0F0F12;
+                color: #FFFFFF;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+            QLineEdit, QTextEdit {
+                background-color: #25262B;
+                color: #FFFFFF;
+                border: 1px solid #3C3E44;
+                border-radius: 12px;
+                padding: 12px 16px;
+                font-size: 15px;
+                selection-background-color: #6C5CE7;
+                selection-color: #FFFFFF;
+            }
+            QLineEdit:focus, QTextEdit:focus {
+                border: 2px solid #6C5CE7;
+            }
+            QPushButton {
+                background-color: #6C5CE7;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 12px;
+                padding: 14px 28px;
+                font-size: 15px;
+                font-weight: 600;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+            QPushButton:hover {
+                background-color: #5A4EC7;
+            }
+            QPushButton:pressed {
+                background-color: #4A3FB8;
+            }
+            QPushButton:disabled {
+                background-color: #2A2B30;
+                color: #5D5F67;
+            }
+            QLabel {
+                color: #FFFFFF;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+            QScrollBar:vertical {
+                background-color: #1A1B1E;
+                width: 8px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #3C3E44;
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #6C5CE7;
+            }
         """)
         
-        # Показываем окно входа
-        print("Показ окна входа...")
-        login = LoginWindow()
+        # Создание мастера регистрации
+        print("3. Создание окна регистрации...")
+        wizard = RegistrationWizard()
+        wizard.registration_complete.connect(lambda data: on_registration_complete(data, wizard))
         
-        if login.exec() == 1 and login.get_user():
-            # Успешный вход — показываем главное окно
-            print("Вход успешен, показываем главное окно...")
-            main_window = MainWindow(login.get_user())
-            main_window.show()
-            sys.exit(app.exec())
-        else:
-            # Отмена входа
-            print("Вход отменён")
-            sys.exit(0)
-            
+        print("4. Показ окна...")
+        wizard.show()
+        
+        print("5. Запуск...")
+        sys.exit(app.exec())
+        
     except Exception as e:
-        print(f"Критическая ошибка при запуске: {e}")
+        print(f"❌ ОШИБКА: {e}")
         import traceback
         traceback.print_exc()
+        input("Нажмите Enter...")
         sys.exit(1)
+
+
+def on_registration_complete(data, wizard):
+    """Обработка завершения регистрации."""
+    print(f"✅ Регистрация завершена: {data}")
+    # Здесь будет создание главного окна
+    wizard.close()
 
 
 if __name__ == "__main__":

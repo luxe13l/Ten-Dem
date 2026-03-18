@@ -50,13 +50,11 @@ def update_user(uid, data):
         if db is None:
             return False
         
-        # Проверяем существование документа перед обновлением
         users_ref = db.collection('users')
         doc = users_ref.document(uid).get()
         
         if not doc.exists:
-            print(f"Предупреждение: документ {uid} не найден, создаём новый")
-            # Создаём новый документ с данными
+            print(f"Документ {uid} не найден, создаём новый")
             new_data = {**data, 'uid': uid}
             users_ref.document(uid).set(new_data)
             return True
