@@ -1,170 +1,277 @@
-"""
-Пузырёк сообщения для чата Ten Dem
-Современный минимализм — дизайн-система v2.0
-"""
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+"""Message bubble widget."""
 
-from src.models.message import Message, MessageType, MessageStatus
-from src.utils.settings import (
-    MESSAGE_OWN_BG, MESSAGE_OWN_TEXT,
-    MESSAGE_OTHER_BG, MESSAGE_OTHER_TEXT,
-    TEXT_TERTIARY, TEXT_ON_ACCENT,
-    READ_CHECK, DELIVERED_CHECK,
-    FONT_FAMILY, FONT_SIZE_MESSAGE, FONT_SIZE_TIME,
-    RADIUS_MESSAGE, PADDING_CARD
+from __future__ import annotations
+
+import os
+
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QCursor, QPixmap
+from PyQt6.QtWidgets import (
+    QFrame,
+    QGraphicsOpacityEffect,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
+
+from src.database.messages_db import QUICK_REACTIONS
+from src.models.message import Message, MessageStatus, MessageType
+from src.styles import FONT_FAMILY, RADIUS_MESSAGE
+from src.styles.themes import get_theme_colors
+
+
+class ClickableLabel(QLabel):
+    clicked = pyqtSignal()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
 
 class MessageBubble(QWidget):
-    """Пузырёк сообщения."""
-    
-    def __init__(self, message: Message, is_own: bool, parent=None):
+    clicked = pyqtSignal(str)
+    photo_requested = pyqtSignal(str)
+    reaction_clicked = pyqtSignal(str, str)
+
+    def __init__(self, message: Message, is_own: bool, current_user_uid: str = "", parent=None):
         super().__init__(parent)
         self.message = message
         self.is_own = is_own
-        self.init_ui()
-    
-    def init_ui(self):
-        """Инициализация интерфейса."""
-        try:
-            # Главный layout
-            main_layout = QHBoxLayout(self)
-            main_layout.setContentsMargins(0, 0, 0, 0)
-            main_layout.setSpacing(0)
-            
-            if self.is_own:
-                main_layout.addStretch()
-            
-            # Карточка сообщения
-            self.bubble = QFrame()
-            self.bubble.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {MESSAGE_OWN_BG if self.is_own else MESSAGE_OTHER_BG};
-                    color: {MESSAGE_OWN_TEXT if self.is_own else MESSAGE_OTHER_TEXT};
-                    border-radius: {RADIUS_MESSAGE}px;
-                    padding: {PADDING_CARD}px;
+        self.current_user_uid = current_user_uid
+        self.colors = get_theme_colors()
+        self._reaction_buttons: dict[str, QPushButton] = {}
+        self._animation: QPropertyAnimation | None = None
+        self.build_ui()
+        self.refresh()
+        self.play_appear_animation()
+
+    def build_ui(self):
+        self.outer = QHBoxLayout(self)
+        self.outer.setContentsMargins(0, 0, 0, 0)
+        self.outer.setSpacing(0)
+        if self.is_own:
+            self.outer.addStretch()
+
+        self.card = QFrame()
+        self.card.setMaximumWidth(560)
+        self.card.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.outer.addWidget(self.card)
+        if not self.is_own:
+            self.outer.addStretch()
+
+        self.content_layout = QVBoxLayout(self.card)
+        self.content_layout.setContentsMargins(14, 10, 14, 10)
+        self.content_layout.setSpacing(8)
+
+        self.forwarded_label = QLabel()
+        self.forwarded_label.hide()
+        self.content_layout.addWidget(self.forwarded_label)
+
+        self.photo_label = ClickableLabel()
+        self.photo_label.setMinimumSize(240, 140)
+        self.photo_label.setMaximumSize(360, 260)
+        self.photo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.photo_label.setScaledContents(False)
+        self.photo_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.photo_label.clicked.connect(lambda: self.photo_requested.emit(self.message.id))
+        self.photo_label.hide()
+        self.content_layout.addWidget(self.photo_label)
+
+        self.content_label = QLabel()
+        self.content_label.setWordWrap(True)
+        self.content_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.content_layout.addWidget(self.content_label)
+
+        self.poll_label = QLabel()
+        self.poll_label.setWordWrap(True)
+        self.poll_label.hide()
+        self.content_layout.addWidget(self.poll_label)
+
+        self.meta_label = QLabel()
+        self.meta_label.setAlignment(Qt.AlignmentFlag.AlignRight if self.is_own else Qt.AlignmentFlag.AlignLeft)
+        self.content_layout.addWidget(self.meta_label)
+
+        self.reactions_row = QWidget()
+        self.reactions_layout = QHBoxLayout(self.reactions_row)
+        self.reactions_layout.setContentsMargins(0, 0, 0, 0)
+        self.reactions_layout.setSpacing(6)
+        self.reactions_row.hide()
+        self.content_layout.addWidget(self.reactions_row)
+
+        self.selection_badge = QLabel("✓")
+        self.selection_badge.setFixedSize(24, 24)
+        self.selection_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.selection_badge.setStyleSheet("display: none;")
+        self.outer.addSpacing(8)
+        self.outer.addWidget(self.selection_badge, 0, Qt.AlignmentFlag.AlignBottom)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit(self.message.id)
+        super().mousePressEvent(event)
+
+    def refresh(self):
+        self.colors = get_theme_colors()
+        bg = self.colors["message_own_bg"] if self.is_own else self.colors["message_other_bg"]
+        text = "#FFFFFF" if self.is_own else self.colors["text_primary"]
+        meta = "#FFFFFF" if self.is_own else self.colors["text_tertiary"]
+        if self.is_own and self.message.status == MessageStatus.READ:
+            meta = self.colors["read_check"]
+        elif self.is_own and self.message.status == MessageStatus.DELIVERED:
+            meta = self.colors["delivered_check"]
+
+        outline = self.colors["accent_primary"] if self.message.is_selected else "transparent"
+        self.card.setStyleSheet(
+            f"""
+            QFrame {{
+                background-color: {bg};
+                border-radius: {RADIUS_MESSAGE}px;
+                border: 1px solid {outline};
+            }}
+            """
+        )
+        self.content_label.setStyleSheet(f"color: {text}; font-size: 15px; font-family: {FONT_FAMILY}; background: transparent;")
+        self.meta_label.setStyleSheet(f"color: {meta}; font-size: 11px; font-family: {FONT_FAMILY}; background: transparent;")
+        self.forwarded_label.setStyleSheet(
+            f"color: {meta}; font-size: 11px; font-family: {FONT_FAMILY}; background: transparent;"
+        )
+        self.poll_label.setStyleSheet(
+            f"color: {text}; font-size: 13px; font-family: {FONT_FAMILY}; background-color: rgba(255,255,255,0.06); border-radius: 12px; padding: 8px 10px;"
+        )
+        self.selection_badge.setStyleSheet(
+            f"""
+            QLabel {{
+                background-color: {self.colors['accent_primary'] if self.message.is_selected else self.colors['bg_tertiary']};
+                color: white;
+                border-radius: 12px;
+                font-size: 13px;
+                font-weight: 700;
+            }}
+            """
+        )
+        self.selection_badge.setVisible(self.message.selection_enabled)
+
+        self.forwarded_label.setVisible(bool(self.message.forwarded_from_uid))
+        if self.message.forwarded_from_uid:
+            self.forwarded_label.setText("Пересланное сообщение")
+
+        self.content_label.setText(self._content_text())
+        self.meta_label.setText(self._meta_text())
+        self._refresh_photo_preview()
+        self._refresh_poll()
+        self._refresh_reactions()
+
+    def update_message(self, message: Message):
+        self.message = message
+        self.refresh()
+
+    def set_selection_state(self, enabled: bool, selected: bool):
+        self.message.selection_enabled = enabled
+        self.message.is_selected = selected
+        self.refresh()
+
+    def _refresh_photo_preview(self):
+        should_show = self.message.message_type in {MessageType.PHOTO, MessageType.VIDEO}
+        self.photo_label.setVisible(should_show and not self.message.is_deleted)
+        if not should_show or self.message.is_deleted:
+            return
+        source = self.message.file_url
+        if source and os.path.exists(source):
+            pixmap = QPixmap(source)
+            if not pixmap.isNull():
+                self.photo_label.setStyleSheet("border-radius: 16px;")
+                self.photo_label.setText("")
+                self.photo_label.setPixmap(
+                    pixmap.scaled(
+                        QSize(320, 220),
+                        Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                )
+                return
+        self.photo_label.setText("Открыть медиа")
+        self.photo_label.setStyleSheet(
+            f"background-color: rgba(255,255,255,0.06); color: {self.colors['text_primary']}; border-radius: 16px;"
+        )
+
+    def _refresh_poll(self):
+        if self.message.message_type != MessageType.POLL or self.message.is_deleted:
+            self.poll_label.hide()
+            return
+        options = "\n".join(f"• {option}" for option in self.message.poll_options)
+        self.poll_label.setText(options)
+        self.poll_label.show()
+
+    def _refresh_reactions(self):
+        while self.reactions_layout.count():
+            item = self.reactions_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        self._reaction_buttons.clear()
+
+        reactions = self.message.reactions or {}
+        if not reactions:
+            self.reactions_row.hide()
+            return
+
+        for emoji in QUICK_REACTIONS:
+            users = reactions.get(emoji, [])
+            if not users:
+                continue
+            button = QPushButton(f"{emoji} {len(users)}")
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            active = self.current_user_uid in users
+            button.setStyleSheet(
+                f"""
+                QPushButton {{
+                    background-color: {'rgba(47, 128, 237, 0.18)' if active else self.colors['bg_tertiary']};
+                    color: {self.colors['text_primary']};
+                    border: none;
+                    border-radius: 12px;
+                    padding: 4px 9px;
+                    font-size: 12px;
                 }}
-            """)
-            
-            # Скругление углов (разное для своих/чужих)
-            if self.is_own:
-                self.bubble.setStyleSheet(self.bubble.styleSheet() + f"""
-                    QFrame {{
-                        border-top-left-radius: {RADIUS_MESSAGE}px;
-                        border-top-right-radius: {RADIUS_MESSAGE}px;
-                        border-bottom-left-radius: {RADIUS_MESSAGE}px;
-                        border-bottom-right-radius: 4px;
-                    }}
-                """)
-            else:
-                self.bubble.setStyleSheet(self.bubble.styleSheet() + f"""
-                    QFrame {{
-                        border-top-left-radius: {RADIUS_MESSAGE}px;
-                        border-top-right-radius: {RADIUS_MESSAGE}px;
-                        border-bottom-left-radius: 4px;
-                        border-bottom-right-radius: {RADIUS_MESSAGE}px;
-                    }}
-                """)
-            
-            bubble_layout = QVBoxLayout(self.bubble)
-            bubble_layout.setSpacing(4)
-            
-            # Если это ответ на сообщение
-            if self.message.reply_to_id:
-                reply_label = QLabel("↩️ Ответ на сообщение")
-                reply_label.setStyleSheet(f"""
-                    color: {TEXT_ON_ACCENT if self.is_own else TEXT_TERTIARY};
-                    font-size: 11px;
-                    font-style: italic;
-                """)
-                bubble_layout.addWidget(reply_label)
-            
-            # Тип сообщения
-            if self.message.message_type == MessageType.PHOTO:
-                content_label = QLabel("📷 Фото")
-            elif self.message.message_type == MessageType.FILE:
-                content_label = QLabel(f"📁 {self.message.file_name}")
-            elif self.message.message_type == MessageType.VOICE:
-                content_label = QLabel(f"🎤 Голосовое ({self.message.duration}с)")
-            elif self.message.message_type == MessageType.VIDEO:
-                content_label = QLabel(f"📹 Видео ({self.message.duration}с)")
-            else:
-                content_label = QLabel(self.message.text)
-            
-            content_label.setStyleSheet(f"""
-                color: {MESSAGE_OWN_TEXT if self.is_own else MESSAGE_OTHER_TEXT};
-                font-size: {FONT_SIZE_MESSAGE}px;
-                font-family: {FONT_FAMILY};
-                font-weight: {400};
-            """)
-            content_label.setWordWrap(True)
-            bubble_layout.addWidget(content_label)
-            
-            # Нижняя строка (время + галочки)
-            bottom_layout = QHBoxLayout()
-            bottom_layout.setSpacing(4)
-            bottom_layout.addStretch() if self.is_own else None
-            
-            # Время
-            time_label = QLabel(self.message.timestamp.strftime("%H:%M"))
-            time_label.setStyleSheet(f"""
-                color: {TEXT_ON_ACCENT if self.is_own else TEXT_TERTIARY};
-                font-size: {FONT_SIZE_TIME}px;
-                font-family: {FONT_FAMILY};
-                opacity: 0.7;
-            """)
-            bottom_layout.addWidget(time_label)
-            
-            # Галочки (только для своих сообщений)
-            if self.is_own:
-                check_icon = self._get_check_icon()
-                if check_icon:
-                    check_label = QLabel(check_icon)
-                    check_label.setStyleSheet(f"""
-                        color: {READ_CHECK if self.message.status == MessageStatus.READ else DELIVERED_CHECK};
-                        font-size: {FONT_SIZE_TIME}px;
-                    """)
-                    bottom_layout.addWidget(check_label)
-            
-            bottom_layout.addStretch() if not self.is_own else None
-            bubble_layout.addLayout(bottom_layout)
-            
-            # Если сообщение отредактировано
-            if self.message.is_edited:
-                edited_label = QLabel("(изм.)")
-                edited_label.setStyleSheet(f"""
-                    color: {TEXT_ON_ACCENT if self.is_own else TEXT_TERTIARY};
-                    font-size: 10px;
-                    opacity: 0.6;
-                """)
-                bottom_layout.addWidget(edited_label)
-            
-            main_layout.addWidget(self.bubble)
-            
-            if not self.is_own:
-                main_layout.addStretch()
-            
-            # Максимальная ширина 70%
-            self.setMaximumWidth(int(self.parent().width() * 0.7) if self.parent() else 500)
-            
-        except Exception as e:
-            print(f"Ошибка инициализации пузырька: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def _get_check_icon(self) -> str:
-        """Возвращает иконку галочки."""
-        if self.message.status == MessageStatus.READ:
-            return "✓✓"  # Прочитано
-        elif self.message.status == MessageStatus.DELIVERED:
-            return "✓✓"  # Доставлено
-        else:
-            return "✓"   # Отправлено
-    
-    def update_status(self, status: MessageStatus):
-        """Обновляет статус сообщения."""
-        self.message.status = status
-        # Перерисовываем галочки
-        self.init_ui()
+                """
+            )
+            button.clicked.connect(lambda _, value=emoji: self.reaction_clicked.emit(self.message.id, value))
+            self.reactions_layout.addWidget(button)
+            self._reaction_buttons[emoji] = button
+        self.reactions_layout.addStretch()
+        self.reactions_row.setVisible(bool(self._reaction_buttons))
+
+    def play_appear_animation(self):
+        effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(effect)
+        self._animation = QPropertyAnimation(effect, b"opacity", self)
+        self._animation.setDuration(180)
+        self._animation.setStartValue(0.0)
+        self._animation.setEndValue(1.0)
+        self._animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._animation.start()
+
+    def _content_text(self):
+        if self.message.is_deleted:
+            return "Сообщение удалено"
+        if self.message.message_type == MessageType.PHOTO:
+            return self.message.text or self.message.file_name or "Фото"
+        if self.message.message_type == MessageType.FILE:
+            return f"Файл: {self.message.file_name or self.message.text}".strip()
+        if self.message.message_type == MessageType.VOICE:
+            return "Голосовое сообщение"
+        if self.message.message_type == MessageType.VIDEO:
+            return self.message.text or "Видео"
+        if self.message.message_type == MessageType.POLL:
+            return self.message.text
+        return self.message.text
+
+    def _meta_text(self):
+        parts = [self.message.timestamp.strftime("%H:%M")]
+        if self.message.is_edited and not self.message.is_deleted:
+            parts.append("изменено")
+        if self.is_own:
+            parts.append("✓✓" if self.message.status in (MessageStatus.READ, MessageStatus.DELIVERED) else "✓")
+        return "  ".join(parts)

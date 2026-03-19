@@ -1,103 +1,75 @@
-"""
-Модуль работы с пользователями в Firebase Firestore
-"""
+"""User storage with Firestore support and local fallback."""
+from __future__ import annotations
+
 from datetime import datetime
+
 from src.database.firebase_client import get_db
+from src.database.local_store import load_store, save_store
 
 
 def get_user_by_phone(phone):
-    """Получает пользователя по номеру телефона."""
-    try:
-        db = get_db()
-        if db is None:
-            return None
-        
-        users_ref = db.collection('users')
-        query = users_ref.where('phone', '==', phone).limit(1)
-        docs = query.stream()
-        
-        for doc in docs:
-            return {'uid': doc.id, **doc.to_dict()}
-        
-        return None
-        
-    except Exception as e:
-        print(f"Ошибка получения пользователя: {e}")
-        return None
+    db = get_db()
+    if db is not None:
+        try:
+            docs = db.collection("users").where("phone", "==", phone).limit(1).stream()
+            for doc in docs:
+                return {"uid": doc.id, **(doc.to_dict() or {})}
+        except Exception as exc:
+            print(f"Ошибка получения пользователя из Firebase: {exc}")
+
+    users = load_store().get("users", {})
+    for uid, data in users.items():
+        if data.get("phone") == phone:
+            return {"uid": uid, **data}
+    return None
 
 
 def create_user(user_data):
-    """Создаёт нового пользователя в базе."""
-    try:
-        db = get_db()
-        if db is None:
-            return ""
-        
-        users_ref = db.collection('users')
-        doc_ref = users_ref.add(user_data)
-        
-        return doc_ref[1].id
-        
-    except Exception as e:
-        print(f"Ошибка создания пользователя: {e}")
-        return ""
+    db = get_db()
+    if db is not None:
+        try:
+            doc_ref = db.collection("users").add(user_data)
+            return doc_ref[1].id
+        except Exception as exc:
+            print(f"Ошибка создания пользователя в Firebase: {exc}")
+
+    uid = user_data.get("uid") or f"user-{int(datetime.now().timestamp())}"
+    store = load_store()
+    store.setdefault("users", {})[uid] = {**user_data, "uid": uid}
+    save_store(store)
+    return uid
 
 
 def update_user(uid, data):
-    """Обновляет данные пользователя."""
-    try:
-        db = get_db()
-        if db is None:
-            return False
-        
-        users_ref = db.collection('users')
-        doc = users_ref.document(uid).get()
-        
-        if not doc.exists:
-            print(f"Документ {uid} не найден, создаём новый")
-            new_data = {**data, 'uid': uid}
-            users_ref.document(uid).set(new_data)
+    db = get_db()
+    if db is not None:
+        try:
+            db.collection("users").document(uid).set(data, merge=True)
             return True
-        
-        users_ref.document(uid).update(data)
-        return True
-        
-    except Exception as e:
-        print(f"Ошибка обновления пользователя: {e}")
-        return False
+        except Exception as exc:
+            print(f"Ошибка обновления пользователя в Firebase: {exc}")
+
+    store = load_store()
+    store.setdefault("users", {})
+    current = store["users"].get(uid, {"uid": uid})
+    current.update(data)
+    current["uid"] = uid
+    store["users"][uid] = current
+    save_store(store)
+    return True
 
 
 def get_all_users():
-    """Получает список всех пользователей."""
-    try:
-        db = get_db()
-        if db is None:
-            return []
-        
-        users_ref = db.collection('users')
-        docs = users_ref.stream()
-        
-        return [{'uid': doc.id, **doc.to_dict()} for doc in docs]
-        
-    except Exception as e:
-        print(f"Ошибка получения списка пользователей: {e}")
-        return []
+    db = get_db()
+    if db is not None:
+        try:
+            docs = db.collection("users").stream()
+            return [{"uid": doc.id, **(doc.to_dict() or {})} for doc in docs]
+        except Exception as exc:
+            print(f"Ошибка получения пользователей из Firebase: {exc}")
+
+    return list(load_store().get("users", {}).values())
 
 
 def set_online_status(uid, status):
-    """Устанавливает статус онлайн/оффлайн."""
-    try:
-        db = get_db()
-        if db is None:
-            return False
-        
-        data = {
-            'status': status,
-            'last_seen': datetime.now()
-        }
-        
-        return update_user(uid, data)
-        
-    except Exception as e:
-        print(f"Ошибка обновления статуса: {e}")
-        return False
+    return update_user(uid, {"status": status, "last_seen": datetime.now()})

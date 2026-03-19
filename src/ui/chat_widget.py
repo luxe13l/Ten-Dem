@@ -1,585 +1,736 @@
-"""
-Виджет чата для Ten Dem
-Интеграция: Firebase (сообщения) + Яндекс (файлы)
-"""
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, 
-                             QPushButton, QLabel, QScrollArea, QFrame, 
-                             QMenu, QApplication, QInputDialog, QMessageBox,
-                             QFileDialog)
-from PyQt6.QtGui import QAction
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-import time
+"""Working chat widget for Ten Dem."""
+
+from __future__ import annotations
+
 import os
 
-from src.models.message import Message, MessageType, MessageStatus
-from src.database.messages_db import send_message, edit_message, delete_message
-from src.ui.message_bubble import MessageBubble
-from src.styles import (
-    COLOR_BACKGROUND, COLOR_PANEL, COLOR_TEXT_PRIMARY, COLOR_DIVIDER,
-    COLOR_ACCENT, FONT_FAMILY, PADDING_CARD
+from PyQt6.QtCore import QEvent, QMimeData, QSize, QTimer, Qt, pyqtSignal
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QKeyEvent
+from PyQt6.QtWidgets import (
+    QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QMenu,
+    QMessageBox,
+    QProgressDialog,
+    QPushButton,
+    QScrollArea,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
+
+from src.database.messages_db import (
+    QUICK_REACTIONS,
+    delete_message as delete_message_record,
+    edit_message as edit_message_record,
+    forward_messages,
+    get_messages,
+    mark_chat_as_read,
+    send_message as send_message_record,
+    toggle_reaction,
+)
+from src.database.users_db import get_all_users
+from src.models.message import Message, MessageStatus, MessageType
+from src.styles import FONT_FAMILY
+from src.styles.themes import get_theme_colors
+from src.ui.attachment_preview_dialog import AttachmentPreviewDialog
+from src.ui.message_bubble import MessageBubble
+from src.ui.photo_viewer_dialog import PhotoViewerDialog
 
 
 class ChatWidget(QWidget):
-    """Виджет чата."""
-    
-    message_sent = pyqtSignal(object)
-    
+    chat_updated = pyqtSignal(str)
+
     def __init__(self, current_user, contact, parent=None):
         super().__init__(parent)
         self.current_user = current_user
         self.contact = contact
-        self.messages = []
-        self.pinned_message = None
-        self.replying_to = None
-        
-        # ✅ Защита от пустого имени
-        if not self.contact.name:
-            self.contact.name = "Пользователь"
-        
-        self.init_ui()
-        self.load_messages()
-    
-    def init_ui(self):
-        """Инициализация интерфейса."""
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-        
-        # ШАПКА ЧАТА
-        header = self._create_header()
-        main_layout.addWidget(header)
-        
-        # ОБЛАСТЬ СООБЩЕНИЙ
+        self.colors = get_theme_colors(getattr(self.current_user, "theme", "dark"))
+        self.messages: list[Message] = []
+        self.message_widgets: dict[str, MessageBubble] = {}
+        self.replying_to: Message | None = None
+        self.pinned_message_id = ""
+        self.selection_mode = False
+        self.selected_message_ids: set[str] = set()
+        self.pending_drop_files: list[str] = []
+        self.setAcceptDrops(True)
+        self.build_ui()
+        self.load_messages(animated=False)
+
+    def build_ui(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        root.addWidget(self._create_header())
+        root.addWidget(self._create_selection_bar())
+
+        self.pinned_bar = QFrame()
+        self.pinned_bar.hide()
+        self.pinned_bar.setStyleSheet(
+            f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-bottom: 1px solid {self.colors['divider']}; }}"
+        )
+        pinned_layout = QHBoxLayout(self.pinned_bar)
+        pinned_layout.setContentsMargins(16, 8, 16, 8)
+        self.pinned_label = QLabel()
+        self.pinned_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 13px;")
+        pinned_layout.addWidget(self.pinned_label, 1)
+        pin_clear = QPushButton("Снять")
+        pin_clear.setStyleSheet(self._ghost_button_style())
+        pin_clear.clicked.connect(self.clear_pinned_message)
+        pinned_layout.addWidget(pin_clear)
+        root.addWidget(self.pinned_bar)
+
+        self.reply_bar = QFrame()
+        self.reply_bar.hide()
+        self.reply_bar.setStyleSheet(
+            f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-bottom: 1px solid {self.colors['divider']}; }}"
+        )
+        reply_layout = QHBoxLayout(self.reply_bar)
+        reply_layout.setContentsMargins(16, 8, 16, 8)
+        self.reply_label = QLabel()
+        self.reply_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 13px;")
+        reply_layout.addWidget(self.reply_label, 1)
+        reply_clear = QPushButton("Отмена")
+        reply_clear.setStyleSheet(self._ghost_button_style())
+        reply_clear.clicked.connect(self.clear_reply)
+        reply_layout.addWidget(reply_clear)
+        root.addWidget(self.reply_bar)
+
         self.messages_scroll = QScrollArea()
         self.messages_scroll.setWidgetResizable(True)
         self.messages_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.messages_scroll.setStyleSheet("""
-            QScrollArea {
-                background-color: transparent;
-                border: none;
-            }
-            QScrollBar:vertical {
-                background-color: transparent;
-                width: 6px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #333;
-                border-radius: 3px;
-                min-height: 20px;
-            }
-        """)
-        
+        self.messages_scroll.setStyleSheet(
+            f"""
+            QScrollArea {{ border: none; background: {self.colors['bg_primary']}; }}
+            QScrollBar:vertical {{ width: 8px; background: transparent; margin: 4px; }}
+            QScrollBar::handle:vertical {{ background: {self.colors['divider']}; border-radius: 4px; }}
+            """
+        )
+
         self.messages_container = QWidget()
         self.messages_layout = QVBoxLayout(self.messages_container)
-        self.messages_layout.setContentsMargins(20, 20, 20, 20)
-        self.messages_layout.setSpacing(8)
+        self.messages_layout.setContentsMargins(18, 18, 18, 18)
+        self.messages_layout.setSpacing(10)
+
+        self.empty_state = QLabel("Здесь пока пусто. Напишите первое сообщение.")
+        self.empty_state.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_state.setStyleSheet(
+            f"color: {self.colors['text_secondary']}; font-size: 14px; padding: 60px 0 20px 0;"
+        )
+        self.messages_layout.addWidget(self.empty_state)
         self.messages_layout.addStretch()
-        
         self.messages_scroll.setWidget(self.messages_container)
-        main_layout.addWidget(self.messages_container, 1)
-        
-        # ПАНЕЛЬ ВВОДА
-        input_panel = self._create_input_panel()
-        main_layout.addWidget(input_panel)
-    
+        root.addWidget(self.messages_scroll, 1)
+
+        root.addWidget(self._create_input_panel())
+
     def _create_header(self):
-        """Создаёт шапку чата."""
-        header = QFrame()
-        header.setFixedHeight(72)
-        header.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLOR_PANEL};
-                border-bottom: 1px solid {COLOR_DIVIDER};
-            }}
-        """)
-        
-        layout = QHBoxLayout(header)
+        frame = QFrame()
+        frame.setFixedHeight(72)
+        frame.setStyleSheet(
+            f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-bottom: 1px solid {self.colors['divider']}; }}"
+        )
+        layout = QHBoxLayout(frame)
         layout.setContentsMargins(20, 0, 20, 0)
-        
-        # Аватар + Имя
-        info_layout = QHBoxLayout()
-        info_layout.setSpacing(12)
-        
-        avatar_name = self.contact.name[0].upper() if self.contact.name else "?"
-        avatar = QLabel(avatar_name)
-        avatar.setFixedSize(40, 40)
-        avatar.setStyleSheet(f"""
+
+        avatar = QLabel((self.contact.name or "?")[0].upper())
+        avatar.setFixedSize(42, 42)
+        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        avatar.setStyleSheet(
+            f"""
             QLabel {{
-                background-color: {COLOR_ACCENT};
-                color: #FFFFFF;
-                border-radius: 20px;
-                font-size: 18px;
+                background-color: {self.colors['accent_primary']};
+                color: white;
+                border-radius: 21px;
+                font-size: 17px;
                 font-weight: 600;
             }}
-        """)
-        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        info_layout.addWidget(avatar)
-        
-        name_layout = QVBoxLayout()
-        name_layout.setSpacing(2)
-        
-        name_label = QLabel(self.contact.name)
-        name_label.setStyleSheet(f"""
-            color: {COLOR_TEXT_PRIMARY};
-            font-size: 16px;
-            font-weight: 600;
-            font-family: {FONT_FAMILY};
-        """)
-        name_layout.addWidget(name_label)
-        
-        status_label = QLabel("в сети")
-        status_label.setStyleSheet("""
-            color: #10B981;
-            font-size: 13px;
-        """)
-        name_layout.addWidget(status_label)
-        
-        info_layout.addLayout(name_layout)
-        layout.addLayout(info_layout)
+            """
+        )
+        layout.addWidget(avatar)
+
+        title_layout = QVBoxLayout()
+        title_layout.setSpacing(2)
+        title = QLabel(self.contact.name or "Пользователь")
+        title.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 16px; font-weight: 600;")
+        title_layout.addWidget(title)
+        status_text = "в сети" if self.contact.status == "online" else "был недавно"
+        status = QLabel(status_text)
+        status.setStyleSheet(f"color: {self.colors['online']}; font-size: 12px;")
+        title_layout.addWidget(status)
+        layout.addLayout(title_layout)
         layout.addStretch()
-        
-        # Кнопка меню
-        menu_btn = QPushButton("⋮")
-        menu_btn.setFixedSize(40, 40)
-        menu_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                border: none;
-                color: #9CA3AF;
-                font-size: 20px;
-            }
-            QPushButton:hover {
-                background-color: #2A2A2A;
-                color: #FFFFFF;
-                border-radius: 8px;
-            }
-        """)
-        
+
+        menu_button = QPushButton("⋮")
+        menu_button.setFixedSize(40, 40)
+        menu_button.setStyleSheet(self._icon_button_style())
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1E1E1E;
-                border: 1px solid #333;
-                border-radius: 8px;
-            }
-            QMenu::item {
-                padding: 8px 16px;
-                color: #FFFFFF;
-            }
-            QMenu::item:hover {
-                background-color: #2A2A2A;
-            }
-        """)
-        
-        menu.addAction("🔍 Поиск")
-        menu.addAction("🔕 Уведомления")
-        menu.addAction("📌 Закреплённые")
-        menu.addSeparator()
-        menu.addAction("🗑️ Очистить историю")
-        menu.addAction("🚫 Удалить чат")
-        
-        menu_btn.setMenu(menu)
-        layout.addWidget(menu_btn)
-        
-        return header
-    
+        menu.setStyleSheet(self._menu_style())
+        select_action = menu.addAction("Выбрать сообщения")
+        select_action.triggered.connect(self.enter_selection_mode)
+        clear_action = menu.addAction("Очистить историю")
+        clear_action.triggered.connect(self.clear_history)
+        menu_button.setMenu(menu)
+        layout.addWidget(menu_button)
+        return frame
+
+    def _create_selection_bar(self):
+        self.selection_bar = QFrame()
+        self.selection_bar.hide()
+        self.selection_bar.setStyleSheet(
+            f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-bottom: 1px solid {self.colors['divider']}; }}"
+        )
+        layout = QHBoxLayout(self.selection_bar)
+        layout.setContentsMargins(16, 10, 16, 10)
+
+        self.selection_label = QLabel("Выбрано: 0")
+        self.selection_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 13px; font-weight: 600;")
+        layout.addWidget(self.selection_label)
+        layout.addStretch()
+
+        forward_btn = QPushButton("Переслать")
+        forward_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        forward_btn.setStyleSheet(self._ghost_button_style(primary=True))
+        forward_btn.clicked.connect(self.forward_selected_messages)
+        layout.addWidget(forward_btn)
+
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancel_btn.setStyleSheet(self._ghost_button_style())
+        cancel_btn.clicked.connect(self.exit_selection_mode)
+        layout.addWidget(cancel_btn)
+        return self.selection_bar
+
     def _create_input_panel(self):
-        """Создаёт панель ввода сообщений."""
         panel = QFrame()
-        panel.setFixedHeight(80)
-        panel.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLOR_PANEL};
-                border-top: 1px solid {COLOR_DIVIDER};
-            }}
-        """)
-        
+        panel.setStyleSheet(
+            f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-top: 1px solid {self.colors['divider']}; }}"
+        )
         layout = QHBoxLayout(panel)
-        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(12)
-        
-        # Кнопка прикрепления
-        attach_btn = QPushButton("📎")
-        attach_btn.setFixedSize(48, 48)
-        attach_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                border: none;
-                color: #9CA3AF;
-                font-size: 24px;
-            }
-            QPushButton:hover {
-                background-color: #2A2A2A;
-                color: #FFFFFF;
-                border-radius: 24px;
-            }
-        """)
-        attach_btn.clicked.connect(self.on_attach_clicked)
-        layout.addWidget(attach_btn)
-        
-        # Поле ввода
+
+        self.attach_btn = QPushButton()
+        self.attach_btn.setFixedSize(42, 42)
+        self.attach_btn.setIcon(QIcon(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets", "icons", "attach.svg")))
+        self.attach_btn.setIconSize(QSize(18, 18))
+        self.attach_btn.setStyleSheet(self._icon_button_style())
+        self.attach_btn.clicked.connect(self.on_attach_clicked)
+        layout.addWidget(self.attach_btn)
+
         self.input_field = QTextEdit()
-        self.input_field.setPlaceholderText("Написать сообщение...")
-        self.input_field.setMaximumHeight(100)
-        self.input_field.setStyleSheet(f"""
+        self.input_field.setMaximumHeight(82)
+        self.input_field.setPlaceholderText("Написать сообщение")
+        self.input_field.installEventFilter(self)
+        self.input_field.textChanged.connect(self.on_text_changed)
+        self.input_field.setStyleSheet(
+            f"""
             QTextEdit {{
-                background-color: #1E1E1E;
-                color: {COLOR_TEXT_PRIMARY};
-                border: 1px solid #333;
-                border-radius: 24px;
-                padding: 12px 16px;
+                background-color: {self.colors['bg_tertiary']};
+                color: {self.colors['text_primary']};
+                border: none;
+                border-radius: 20px;
+                padding: 10px 14px;
                 font-size: 15px;
                 font-family: {FONT_FAMILY};
-                selection-background-color: {COLOR_ACCENT};
             }}
-            QTextEdit:focus {{
-                border: 2px solid {COLOR_ACCENT};
-            }}
-        """)
-        self.input_field.textChanged.connect(self.on_text_changed)
-        self.input_field.installEventFilter(self)
-        layout.addWidget(self.input_field, 1)
-        
-        # Кнопка отправки
-        self.send_btn = QPushButton("➤")
-        self.send_btn.setFixedSize(48, 48)
-        self.send_btn.setEnabled(False)
-        self.send_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_ACCENT};
-                border: none;
-                color: #FFFFFF;
-                font-size: 20px;
-                border-radius: 24px;
-            }}
-            QPushButton:hover {{
-                background-color: #8B5CF6;
-            }}
-            QPushButton:disabled {{
-                background-color: #333;
-                color: #666;
-            }}
-        """)
-        self.send_btn.clicked.connect(self.on_send_clicked)
-        layout.addWidget(self.send_btn)
-        
-        return panel
-    
-    def load_messages(self):
-        """Загружает сообщения из базы данных."""
-        self.add_test_messages()
-    
-    def add_test_messages(self):
-        """Добавляет тестовые сообщения."""
-        test_messages = [
-            Message(id='1', from_uid=self.contact.uid, to_uid=self.current_user.uid, text="Привет! Как дела?"),
-            Message(id='2', from_uid=self.current_user.uid, to_uid=self.contact.uid, text="Всё отлично!", status=MessageStatus.READ),
-        ]
-        for msg in test_messages:
-            self.add_message_to_ui(msg)
-    
-    def add_message_to_ui(self, message: Message):
-        """Добавляет сообщение в UI."""
-        is_own = message.from_uid == self.current_user.uid
-        bubble = MessageBubble(message, is_own)
-        
-        bubble.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        bubble.customContextMenuRequested.connect(lambda pos, m=message: self.show_message_menu(pos, m))
-        
-        self.messages_layout.insertWidget(self.messages_layout.count() - 1, bubble)
-        self.messages.append(message)
-        
-        # Прокрутка вниз
-        self.messages_scroll.verticalScrollBar().setValue(
-            self.messages_scroll.verticalScrollBar().maximum()
+            """
         )
-    
-    def show_message_menu(self, pos, message: Message):
-        """Показывает контекстное меню сообщения."""
+        self.input_field.setMinimumHeight(44)
+        layout.addWidget(self.input_field, 1)
+
+        self.send_btn = QPushButton()
+        self.send_btn.setEnabled(False)
+        self.send_btn.setFixedSize(42, 42)
+        self.send_btn.setIcon(QIcon(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets", "icons", "send.svg")))
+        self.send_btn.setIconSize(QSize(18, 18))
+        self.send_btn.clicked.connect(self.on_send_clicked)
+        self.send_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background-color: {self.colors['accent_primary']};
+                color: white;
+                border: none;
+                border-radius: 21px;
+            }}
+            QPushButton:hover {{ background-color: {self.colors['accent_hover']}; }}
+            QPushButton:disabled {{
+                background-color: {self.colors['divider']};
+                color: {self.colors['text_secondary']};
+            }}
+            """
+        )
+        layout.addWidget(self.send_btn)
+        return panel
+
+    def load_messages(self, animated: bool = True):
+        self._show_loading_state()
+        QTimer.singleShot(80 if animated else 0, self._finish_loading_messages)
+
+    def _show_loading_state(self):
+        while self.messages_layout.count():
+            item = self.messages_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                if widget is self.empty_state:
+                    widget.hide()
+                else:
+                    widget.deleteLater()
+        for _ in range(3):
+            skeleton = QFrame()
+            skeleton.setFixedHeight(54)
+            skeleton.setStyleSheet(
+                f"QFrame {{ background-color: {self.colors['bg_tertiary']}; border-radius: 18px; }}"
+            )
+            self.messages_layout.addWidget(skeleton)
+        self.messages_layout.addStretch()
+
+    def _finish_loading_messages(self):
+        self.messages.clear()
+        self.message_widgets.clear()
+        while self.messages_layout.count():
+            item = self.messages_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                if widget is self.empty_state:
+                    widget.hide()
+                else:
+                    widget.deleteLater()
+
+        records = get_messages(self.current_user.uid, self.contact.uid, limit=200)
+        self.messages_layout.addWidget(self.empty_state)
+        self.empty_state.setVisible(not records)
+
+        for record in records:
+            if self.current_user.uid in record.get("deleted_for", []):
+                continue
+            message = Message.from_dict(record, record.get("id"))
+            self._add_message_widget(message)
+        self.messages_layout.addStretch()
+
+        mark_chat_as_read(self.current_user.uid, self.contact.uid)
+        QTimer.singleShot(0, self.scroll_to_bottom)
+
+    def _add_message_widget(self, message: Message):
+        message.selection_enabled = self.selection_mode
+        message.is_selected = message.id in self.selected_message_ids
+        bubble = MessageBubble(
+            message,
+            message.from_uid == self.current_user.uid,
+            current_user_uid=self.current_user.uid,
+            parent=self.messages_container,
+        )
+        bubble.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        bubble.customContextMenuRequested.connect(
+            lambda pos, msg_id=message.id, widget=bubble: self.show_message_menu(widget, pos, msg_id)
+        )
+        bubble.clicked.connect(self.on_bubble_clicked)
+        bubble.photo_requested.connect(self.open_photo_viewer)
+        bubble.reaction_clicked.connect(self.apply_reaction)
+        self.messages_layout.insertWidget(max(0, self.messages_layout.count() - 1), bubble)
+        self.messages.append(message)
+        self.message_widgets[message.id] = bubble
+        self.empty_state.hide()
+
+    def on_bubble_clicked(self, message_id: str):
+        if not self.selection_mode:
+            return
+        if message_id in self.selected_message_ids:
+            self.selected_message_ids.remove(message_id)
+        else:
+            self.selected_message_ids.add(message_id)
+        self._refresh_selection_widgets()
+
+    def show_message_menu(self, bubble: MessageBubble, pos, message_id: str):
+        message = self._find_message(message_id)
+        if not message:
+            return
+
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1E1E1E;
-                border: 1px solid #333;
-                border-radius: 8px;
-            }
-            QMenu::item {
-                padding: 8px 16px;
-                color: #FFFFFF;
-            }
-            QMenu::item:hover {
-                background-color: #2A2A2A;
-            }
-        """)
-        
-        reply_action = menu.addAction("↩️ Ответить")
-        edit_action = menu.addAction("✏️ Редактировать")
-        forward_action = menu.addAction("➡️ Переслать")
+        menu.setStyleSheet(self._menu_style())
+        reply_action = menu.addAction("Ответить")
+        pin_action = menu.addAction("Закрепить")
+        react_menu = menu.addMenu("Реакции")
+        for emoji in QUICK_REACTIONS:
+            action = react_menu.addAction(emoji)
+            action.triggered.connect(lambda _, value=emoji, msg_id=message.id: self.apply_reaction(msg_id, value))
         menu.addSeparator()
-        delete_action = menu.addAction("🗑️ Удалить")
-        
-        action = menu.exec(self.mapToGlobal(pos))
-        
+        select_action = menu.addAction("Выбрать")
+        forward_action = menu.addAction("Переслать")
+        edit_action = menu.addAction("Изменить") if message.from_uid == self.current_user.uid and not message.is_deleted else None
+        delete_me_action = menu.addAction("Удалить у меня")
+        delete_all_action = menu.addAction("Удалить у всех") if message.from_uid == self.current_user.uid else None
+
+        action = menu.exec(bubble.mapToGlobal(pos))
         if action == reply_action:
             self.reply_to_message(message)
-        elif action == edit_action:
-            self.edit_message(message)
+        elif action == pin_action:
+            self.pin_message(message)
+        elif action == select_action:
+            self.enter_selection_mode()
+            self.selected_message_ids.add(message.id)
+            self._refresh_selection_widgets()
         elif action == forward_action:
-            self.forward_message(message)
-        elif action == delete_action:
-            self.delete_message(message)
-    
+            self.enter_selection_mode()
+            self.selected_message_ids = {message.id}
+            self._refresh_selection_widgets()
+            self.forward_selected_messages()
+        elif edit_action and action == edit_action:
+            self.edit_message(message)
+        elif action == delete_me_action:
+            self.delete_message(message, for_everyone=False)
+        elif delete_all_action and action == delete_all_action:
+            self.delete_message(message, for_everyone=True)
+
     def on_send_clicked(self):
-        """Отправляет сообщение."""
         text = self.input_field.toPlainText().strip()
-        if not text:
-            return
-        
-        message = Message(
-            id=str(hash(text + str(time.time()))),
+        if text:
+            self._send(text=text, message_type=MessageType.TEXT)
+
+    def _send(
+        self,
+        text: str,
+        message_type: MessageType,
+        file_url: str = "",
+        file_name: str = "",
+        file_size: int = 0,
+        poll_options: list[str] | None = None,
+    ):
+        message_id = send_message_record(
             from_uid=self.current_user.uid,
             to_uid=self.contact.uid,
             text=text,
-            message_type=MessageType.TEXT,
-            status=MessageStatus.SENT
+            message_type=message_type,
+            file_url=file_url,
+            file_name=file_name,
+            file_size=file_size,
+            reply_to_id=self.replying_to.id if self.replying_to else "",
+            poll_options=poll_options or [],
         )
-        
-        send_message(
-            from_uid=self.current_user.uid,
-            to_uid=self.contact.uid,
-            text=text
-        )
-        
-        self.add_message_to_ui(message)
-        self.input_field.clear()
-        self.send_btn.setEnabled(False)
-        
-        # Имитация ответа
-        QTimer.singleShot(2000, lambda: self.simulate_reply())
-    
-    def simulate_reply(self):
-        """Имитирует ответ собеседника."""
-        import random
-        replies = ["Отлично!", "Понял", "Круто!", "👍"]
-        message = Message(
-            id=str(hash(str(random.random()))),
-            from_uid=self.contact.uid,
-            to_uid=self.current_user.uid,
-            text=random.choice(replies),
-            message_type=MessageType.TEXT
-        )
-        self.add_message_to_ui(message)
-    
-    def on_text_changed(self):
-        """Обрабатывает изменение текста."""
-        text = self.input_field.toPlainText().strip()
-        self.send_btn.setEnabled(len(text) > 0)
-    
-    def on_attach_clicked(self):
-        """Клик по кнопке прикрепления - открывает меню."""
-        menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1E1E1E;
-                border: 1px solid #333;
-                border-radius: 8px;
-            }
-            QMenu::item {
-                padding: 10px 16px;
-                color: #FFFFFF;
-                font-size: 14px;
-            }
-            QMenu::item:hover {
-                background-color: #2A2A2A;
-            }
-        """)
-        
-        photo_action = menu.addAction("📷 Фото/Видео")
-        file_action = menu.addAction("📁 Файл")
-        voice_action = menu.addAction("🎤 Голосовое")
-        
-        action = menu.exec(self.mapToGlobal(self.sender().pos()))
-        
-        if action == photo_action:
-            self.attach_photo()
-        elif action == file_action:
-            self.attach_file()
-        elif action == voice_action:
-            self.record_voice()
-    
-    def attach_photo(self):
-        """Прикрепить фото - загрузка в Яндекс.Хранилище."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Выберите фото", "",
-            "Images (*.png *.jpg *.jpeg *.gif)"
-        )
-        if file_path:
-            print(f"📷 Фото выбрано: {file_path}")
-            
-            # ✅ Загружаем в Яндекс.Хранилище
-            try:
-                from src.database.yandex_storage import yandex_storage
-                
-                if yandex_storage:
-                    file_url = yandex_storage.upload_message_file(
-                        self.contact.uid,
-                        file_path,
-                        os.path.basename(file_path)
-                    )
-                    
-                    if file_url:
-                        print(f"✅ Фото загружено в Яндекс: {file_url}")
-                        self.send_message(
-                            f"📷 Фото",
-                            message_type=MessageType.PHOTO,
-                            file_url=file_url
-                        )
-                    else:
-                        QMessageBox.warning(self, "Ошибка", "Не удалось загрузить фото")
-                else:
-                    print("⚠️ Яндекс.Хранилище не инициализировано")
-                    self.send_message(
-                        f"📷 Фото: {os.path.basename(file_path)}",
-                        message_type=MessageType.PHOTO,
-                        file_url=file_path
-                    )
-                    
-            except Exception as e:
-                print(f"❌ Ошибка загрузки фото: {e}")
-                self.send_message(
-                    f"📷 Фото: {os.path.basename(file_path)}",
-                    message_type=MessageType.PHOTO,
-                    file_url=file_path
-                )
-    
-    def attach_file(self):
-        """Прикрепить файл - загрузка в Яндекс.Хранилище."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Выберите файл", "",
-            "All Files (*)"
-        )
-        if file_path:
-            print(f"📁 Файл выбран: {file_path}")
-            
-            # ✅ Загружаем в Яндекс.Хранилище
-            try:
-                from src.database.yandex_storage import yandex_storage
-                
-                if yandex_storage:
-                    file_url = yandex_storage.upload_message_file(
-                        self.contact.uid,
-                        file_path,
-                        os.path.basename(file_path)
-                    )
-                    
-                    if file_url:
-                        print(f"✅ Файл загружен в Яндекс: {file_url}")
-                        self.send_message(
-                            f"📁 {os.path.basename(file_path)}",
-                            message_type=MessageType.FILE,
-                            file_url=file_url
-                        )
-                    else:
-                        QMessageBox.warning(self, "Ошибка", "Не удалось загрузить файл")
-                else:
-                    print("⚠️ Яндекс.Хранилище не инициализировано")
-                    self.send_message(
-                        f"📁 {os.path.basename(file_path)}",
-                        message_type=MessageType.FILE,
-                        file_url=file_path
-                    )
-                    
-            except Exception as e:
-                print(f"❌ Ошибка загрузки файла: {e}")
-                self.send_message(
-                    f"📁 {os.path.basename(file_path)}",
-                    message_type=MessageType.FILE,
-                    file_url=file_path
-                )
-    
-    def record_voice(self):
-        """Записать голосовое."""
-        print("🎤 Запись голосового...")
-        QMessageBox.information(self, "Голосовое", "Функция записи в разработке")
-    
-    def send_message(self, text, message_type=MessageType.TEXT, file_url=""):
-        """Отправляет сообщение."""
-        if not text:
+        if not message_id:
+            QMessageBox.warning(self, "Ошибка", "Не удалось отправить сообщение.")
             return
-        
+
         message = Message(
-            id=str(hash(text + str(time.time()))),
+            id=message_id,
             from_uid=self.current_user.uid,
             to_uid=self.contact.uid,
             text=text,
             message_type=message_type,
             status=MessageStatus.SENT,
-            file_url=file_url
+            file_url=file_url,
+            file_name=file_name,
+            file_size=file_size,
+            reply_to_id=self.replying_to.id if self.replying_to else "",
+            poll_options=poll_options or [],
         )
-        
-        send_message(
-            from_uid=self.current_user.uid,
-            to_uid=self.contact.uid,
-            text=text,
-            message_type=message_type,
-            file_url=file_url
-        )
-        
-        self.add_message_to_ui(message)
+        self._add_message_widget(message)
         self.input_field.clear()
-        self.send_btn.setEnabled(False)
-    
+        self.clear_reply()
+        self.scroll_to_bottom()
+        self.chat_updated.emit(self.contact.uid)
+
     def reply_to_message(self, message: Message):
-        """Ответить на сообщение."""
-        self.input_field.setFocus()
-        self.input_field.setPlaceholderText(f"↩️ Ответ: {message.text[:30]}...")
         self.replying_to = message
-    
+        preview = message.text or message.file_name or "медиа"
+        self.reply_label.setText(f"Ответ на: {preview[:60]}")
+        self.reply_bar.show()
+        self.input_field.setFocus()
+
+    def clear_reply(self):
+        self.replying_to = None
+        self.reply_bar.hide()
+        self.reply_label.clear()
+
+    def pin_message(self, message: Message):
+        preview = message.text or message.file_name or "медиа"
+        self.pinned_message_id = message.id
+        self.pinned_label.setText(f"Закреплено: {preview[:70]}")
+        self.pinned_bar.show()
+
+    def clear_pinned_message(self):
+        self.pinned_message_id = ""
+        self.pinned_bar.hide()
+        self.pinned_label.clear()
+
     def edit_message(self, message: Message):
-        """Редактировать сообщение."""
-        if message.from_uid != self.current_user.uid:
+        new_text, ok = QInputDialog.getText(self, "Изменить сообщение", "Новый текст:", text=message.text)
+        if not ok:
             return
-        
-        new_text, ok = QInputDialog.getText(
-            self, "Редактировать сообщение", "",
-            text=message.text
-        )
-        
-        if ok and new_text:
-            edit_message(message.id, new_text)
-            print(f"✏️ Сообщение отредактировано: {new_text}")
-    
-    def forward_message(self, message: Message):
-        """Переслать сообщение."""
-        print(f"➡️ Переслать: {message.text}")
-        QMessageBox.information(self, "Пересылка", "Функция пересылки в разработке")
-    
-    def delete_message(self, message: Message):
-        """Удалить сообщение."""
-        reply = QMessageBox.question(
-            self, "Удалить сообщение",
-            "Удалить для всех или только для себя?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            delete_message(message.id, for_everyone=True)
-            print("🗑️ Сообщение удалено для всех")
-        elif reply == QMessageBox.StandardButton.No:
-            delete_message(message.id, for_everyone=False)
-            print("🗑️ Сообщение удалено для себя")
-    
+        new_text = new_text.strip()
+        if not new_text:
+            return
+        if not edit_message_record(message.id, new_text):
+            QMessageBox.warning(self, "Ошибка", "Не удалось изменить сообщение.")
+            return
+        message.text = new_text
+        message.is_edited = True
+        bubble = self.message_widgets.get(message.id)
+        if bubble:
+            bubble.update_message(message)
+        self.chat_updated.emit(self.contact.uid)
+
+    def delete_message(self, message: Message, for_everyone: bool):
+        if not delete_message_record(message.id, for_everyone=for_everyone, deleted_by=self.current_user.uid):
+            QMessageBox.warning(self, "Ошибка", "Не удалось удалить сообщение.")
+            return
+        if for_everyone:
+            message.is_deleted = True
+            message.text = "Сообщение удалено"
+            bubble = self.message_widgets.get(message.id)
+            if bubble:
+                bubble.update_message(message)
+        else:
+            bubble = self.message_widgets.pop(message.id, None)
+            if bubble:
+                bubble.deleteLater()
+            self.messages = [item for item in self.messages if item.id != message.id]
+        self.selected_message_ids.discard(message.id)
+        self.empty_state.setVisible(not self.messages)
+        self._refresh_selection_widgets()
+        self.chat_updated.emit(self.contact.uid)
+
+    def apply_reaction(self, message_id: str, emoji: str):
+        reactions = toggle_reaction(message_id, emoji, self.current_user.uid)
+        if reactions is None:
+            return
+        message = self._find_message(message_id)
+        if not message:
+            return
+        message.reactions = reactions
+        bubble = self.message_widgets.get(message.id)
+        if bubble:
+            bubble.update_message(message)
+
+    def clear_history(self):
+        if QMessageBox.question(self, "Очистить историю", "Удалить переписку только у вас?") != QMessageBox.StandardButton.Yes:
+            return
+        for message in list(self.messages):
+            self.delete_message(message, for_everyone=False)
+
+    def enter_selection_mode(self):
+        if self.selection_mode:
+            return
+        self.selection_mode = True
+        self.selection_bar.show()
+        self._refresh_selection_widgets()
+
+    def exit_selection_mode(self):
+        self.selection_mode = False
+        self.selected_message_ids.clear()
+        self.selection_bar.hide()
+        self._refresh_selection_widgets()
+
+    def _refresh_selection_widgets(self):
+        self.selection_label.setText(f"Выбрано: {len(self.selected_message_ids)}")
+        for message in self.messages:
+            bubble = self.message_widgets.get(message.id)
+            if bubble:
+                bubble.set_selection_state(self.selection_mode, message.id in self.selected_message_ids)
+        if self.selection_mode and not self.selected_message_ids:
+            self.selection_label.setText("Выберите сообщения")
+
+    def forward_selected_messages(self):
+        if not self.selected_message_ids:
+            QMessageBox.information(self, "Пересылка", "Сначала выберите сообщения.")
+            return
+        users = [user for user in get_all_users() if user.get("uid") not in {self.current_user.uid, self.contact.uid}]
+        if not users:
+            QMessageBox.information(self, "Пересылка", "Пока нет других чатов для пересылки.")
+            return
+        labels = [f"{user.get('name', 'Пользователь')} (@{user.get('username', '')})".strip() for user in users]
+        picked, ok = QInputDialog.getItem(self, "Переслать", "Выберите чат:", labels, 0, False)
+        if not ok or not picked:
+            return
+        target = users[labels.index(picked)]
+        created = forward_messages(self.current_user.uid, list(self.selected_message_ids), target.get("uid"))
+        if not created:
+            QMessageBox.warning(self, "Пересылка", "Не удалось переслать сообщения.")
+            return
+        self.exit_selection_mode()
+        QMessageBox.information(self, "Пересылка", f"Переслано сообщений: {len(created)}")
+
+    def on_text_changed(self):
+        self.send_btn.setEnabled(bool(self.input_field.toPlainText().strip()))
+
+    def on_attach_clicked(self):
+        menu = QMenu(self)
+        menu.setStyleSheet(self._menu_style())
+        photo_action = menu.addAction("Фото")
+        video_action = menu.addAction("Видео")
+        poll_action = menu.addAction("Опрос")
+        file_action = menu.addAction("Файл")
+        action = menu.exec(self.attach_btn.mapToGlobal(self.attach_btn.rect().bottomLeft()))
+        if action == photo_action:
+            self.attach_photo()
+        elif action == video_action:
+            self.attach_video()
+        elif action == poll_action:
+            self.attach_poll()
+        elif action == file_action:
+            self.attach_file()
+
+    def attach_photo(self):
+        files, _ = QFileDialog.getOpenFileNames(self, "Выберите фото", "", "Images (*.png *.jpg *.jpeg *.gif *.webp)")
+        if files:
+            self.preview_and_send_files(files, MessageType.PHOTO)
+
+    def attach_video(self):
+        files, _ = QFileDialog.getOpenFileNames(self, "Выберите видео", "", "Video Files (*.mp4 *.mov *.avi *.mkv)")
+        if files:
+            self.preview_and_send_files(files, MessageType.VIDEO)
+
+    def attach_file(self):
+        files, _ = QFileDialog.getOpenFileNames(self, "Выберите файлы", "", "All Files (*)")
+        if files:
+            self.preview_and_send_files(files, MessageType.FILE)
+
+    def attach_poll(self):
+        question, ok = QInputDialog.getText(self, "Опрос", "Вопрос:")
+        if not ok or not question.strip():
+            return
+        options, ok = QInputDialog.getText(self, "Опрос", "Варианты через запятую:")
+        if not ok or not options.strip():
+            return
+        poll_options = [item.strip() for item in options.split(",") if item.strip()]
+        if len(poll_options) < 2:
+            QMessageBox.information(self, "Опрос", "Нужно минимум два варианта.")
+            return
+        self._send(question.strip(), MessageType.POLL, poll_options=poll_options)
+
+    def preview_and_send_files(self, files: list[str], kind: MessageType):
+        dialog = AttachmentPreviewDialog(files, parent=self)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        progress = QProgressDialog("Подготовка файлов...", "Отмена", 0, len(files), self)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        for index, file_path in enumerate(files, start=1):
+            if progress.wasCanceled():
+                break
+            progress.setValue(index - 1)
+            progress.setLabelText(f"Отправка: {os.path.basename(file_path)}")
+            self._send(
+                text=os.path.basename(file_path) if kind == MessageType.FILE else "",
+                message_type=kind,
+                file_url=file_path,
+                file_name=os.path.basename(file_path),
+                file_size=os.path.getsize(file_path) if os.path.exists(file_path) else 0,
+            )
+            QTimer.singleShot(10, lambda: None)
+        progress.setValue(len(files))
+
+    def open_photo_viewer(self, message_id: str):
+        media = [message.to_dict() for message in self.messages if message.message_type in {MessageType.PHOTO, MessageType.VIDEO} and not message.is_deleted]
+        if not media:
+            return
+        target_index = next((index for index, item in enumerate(media) if item.get("id") == message_id), 0)
+        viewer = PhotoViewerDialog(media, target_index, self)
+        viewer.delete_requested.connect(self._delete_from_viewer)
+        viewer.exec()
+
+    def _delete_from_viewer(self, message_id: str):
+        message = self._find_message(message_id)
+        if message:
+            self.delete_message(message, for_everyone=message.from_uid == self.current_user.uid)
+
+    def _find_message(self, message_id: str) -> Message | None:
+        for message in self.messages:
+            if message.id == message_id:
+                return message
+        return None
+
+    def scroll_to_bottom(self):
+        bar = self.messages_scroll.verticalScrollBar()
+        bar.setValue(bar.maximum())
+
     def eventFilter(self, obj, event):
-        """Перехватывает события."""
-        from PyQt6.QtCore import QEvent
-        
         if obj == self.input_field and event.type() == QEvent.Type.KeyPress:
-            from PyQt6.QtGui import QKeyEvent
-            key_event = event
-            if key_event.key() == Qt.Key.Key_Return and not key_event.modifiers():
+            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not event.modifiers():
                 if self.send_btn.isEnabled():
                     self.on_send_clicked()
                 return True
-        
         return super().eventFilter(obj, event)
+
+    def keyPressEvent(self, event: QKeyEvent):
+        if event.key() == Qt.Key.Key_Escape and self.selection_mode:
+            self.exit_selection_mode()
+            return
+        super().keyPressEvent(event)
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if self._mime_has_files(event.mimeData()):
+            event.acceptProposedAction()
+            return
+        super().dragEnterEvent(event)
+
+    def dropEvent(self, event: QDropEvent):
+        files = self._extract_files(event.mimeData())
+        if not files:
+            return
+        self.pending_drop_files = files
+        self.preview_and_send_files(files, self._guess_kind(files))
+        self.pending_drop_files = []
+        event.acceptProposedAction()
+
+    def _mime_has_files(self, mime: QMimeData) -> bool:
+        return mime.hasUrls() and any(url.isLocalFile() for url in mime.urls())
+
+    def _extract_files(self, mime: QMimeData) -> list[str]:
+        return [url.toLocalFile() for url in mime.urls() if url.isLocalFile()]
+
+    def _guess_kind(self, files: list[str]) -> MessageType:
+        if all(file.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")) for file in files):
+            return MessageType.PHOTO
+        if all(file.lower().endswith((".mp4", ".mov", ".avi", ".mkv")) for file in files):
+            return MessageType.VIDEO
+        return MessageType.FILE
+
+    def _menu_style(self):
+        return f"""
+        QMenu {{
+            background-color: {self.colors['bg_secondary']};
+            color: {self.colors['text_primary']};
+            border: 1px solid {self.colors['divider']};
+            border-radius: 14px;
+            padding: 8px;
+        }}
+        QMenu::item {{
+            padding: 8px 14px;
+            border-radius: 8px;
+        }}
+        QMenu::item:selected {{ background-color: {self.colors['bg_tertiary']}; }}
+        """
+
+    def _icon_button_style(self):
+        return f"""
+        QPushButton {{
+            background-color: {self.colors['bg_tertiary']};
+            color: {self.colors['icon_default']};
+            border: none;
+            border-radius: 21px;
+        }}
+        QPushButton:hover {{
+            background-color: {self.colors['divider']};
+            color: {self.colors['text_primary']};
+        }}
+        """
+
+    def _ghost_button_style(self, primary: bool = False):
+        color = self.colors["accent_primary"] if primary else self.colors["text_secondary"]
+        hover = self.colors["text_primary"] if not primary else self.colors["accent_hover"]
+        return f"""
+        QPushButton {{
+            background-color: transparent;
+            color: {color};
+            border: none;
+            padding: 4px 8px;
+            font-weight: {'600' if primary else '400'};
+        }}
+        QPushButton:hover {{
+            color: {hover};
+        }}
+        """

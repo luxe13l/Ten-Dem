@@ -1,298 +1,276 @@
-"""
-Главное окно мессенджера Ten Dem
-"""
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QListWidget, QListWidgetItem, QLabel, QPushButton,
-                             QLineEdit)
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont
+"""Main messenger window."""
+from __future__ import annotations
 
-from src.models.user import User
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMainWindow,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
+from src.database.messages_db import get_chat_summaries
 from src.database.users_db import get_all_users, set_online_status
+from src.models.user import User
+from src.styles import FONT_FAMILY, LEFT_PANEL_WIDTH, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH
+from src.styles.themes import get_theme_colors
 from src.ui.chat_widget import ChatWidget
 from src.ui.contact_item import ContactItem
-
-try:
-    from src.styles import (
-        COLOR_BACKGROUND, COLOR_PANEL, COLOR_TEXT_PRIMARY, COLOR_DIVIDER,
-        FONT_FAMILY, INPUT_BORDER_RADIUS, COLOR_INPUT_BG, COLOR_INPUT_BORDER,
-        COLOR_ACCENT
-    )
-except ImportError:
-    COLOR_BACKGROUND = '#0A0A0A'
-    COLOR_PANEL = '#141414'
-    COLOR_TEXT_PRIMARY = '#FFFFFF'
-    COLOR_DIVIDER = '#2A2A2A'
-    FONT_FAMILY = 'Segoe UI'
-    INPUT_BORDER_RADIUS = 12
-    COLOR_INPUT_BG = '#1E1E1E'
-    COLOR_INPUT_BORDER = '#333333'
-    COLOR_ACCENT = '#7C3AED'
+from src.ui.contact_info_dialog import ContactInfoDialog
+from src.ui.settings_window import SettingsWindow
 
 
 class MainWindow(QMainWindow):
     def __init__(self, current_user, parent=None):
         super().__init__(parent)
         self.current_user = current_user
+        self.colors = get_theme_colors(getattr(self.current_user, "theme", "dark"))
         self.current_chat_widget = None
-        self.contacts_list = None
-        self.placeholder_widget = None
-        self.right_panel = None
         self.settings_window = None
-        print(f"🔵 Инициализация MainWindow для {current_user.name}...")
+        self.contact_widgets = {}
         self.init_ui()
         set_online_status(self.current_user.uid, "online")
-        print("✅ MainWindow инициализировано")
-    
+
     def init_ui(self):
-        try:
-            self.setWindowTitle(f"Ten Dem — {self.current_user.name}")
-            self.setMinimumSize(1200, 800)
-            self.resize(1200, 800)
-            self.setStyleSheet(f"background-color: {COLOR_BACKGROUND};")
-            
-            central = QWidget()
-            self.setCentralWidget(central)
-            main_layout = QHBoxLayout(central)
-            main_layout.setContentsMargins(0, 0, 0, 0)
-            main_layout.setSpacing(0)
-            
-            left_panel = QWidget()
-            left_panel.setFixedWidth(380)
-            left_panel.setStyleSheet(f"""
-                QWidget {{
-                    background-color: {COLOR_PANEL};
-                    border-right: 1px solid {COLOR_DIVIDER};
-                }}
-            """)
-            left_layout = QVBoxLayout(left_panel)
-            left_layout.setContentsMargins(0, 0, 0, 0)
-            left_layout.setSpacing(0)
-            
-            header = QHBoxLayout()
-            header.setContentsMargins(20, 20, 20, 15)
-            
-            title = QLabel("Ten Dem")
-            title.setFont(QFont(FONT_FAMILY, 20, QFont.Weight.Bold))
-            title.setStyleSheet(f"color: {COLOR_TEXT_PRIMARY};")
-            header.addWidget(title)
-            header.addStretch()
-            
-            settings_btn = QPushButton("⚙")
-            settings_btn.setFixedSize(40, 40)
-            settings_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: transparent;
-                    border: none;
-                    font-size: 22px;
-                    color: {COLOR_TEXT_PRIMARY};
-                }}
-                QPushButton:hover {{
-                    background-color: #2A2A2A;
-                    color: #FFFFFF;
-                    border-radius: 8px;
-                }}
-            """)
-            settings_btn.clicked.connect(self.open_settings)
-            header.addWidget(settings_btn)
-            left_layout.addLayout(header)
-            
-            search_input = QLineEdit()
-            search_input.setPlaceholderText("Поиск контактов...")
-            search_input.setStyleSheet(f"""
-                QLineEdit {{
-                    background-color: {COLOR_INPUT_BG};
-                    color: {COLOR_TEXT_PRIMARY};
-                    border: 1px solid {COLOR_INPUT_BORDER};
-                    border-radius: {INPUT_BORDER_RADIUS}px;
-                    padding: 10px 16px;
-                    font-size: 14px;
-                    font-family: {FONT_FAMILY};
-                    margin: 0 16px 16px;
-                }}
-            """)
-            search_input.textChanged.connect(self.filter_contacts)
-            left_layout.addWidget(search_input)
-            
-            self.contacts_list = QListWidget()
-            self.contacts_list.setStyleSheet(f"""
-                QListWidget {{
-                    background-color: transparent;
-                    border: none;
-                    outline: none;
-                }}
-                QListWidget::item {{
-                    padding: 5px;
-                    border-radius: 8px;
-                    margin: 0 8px;
-                }}
-                QListWidget::item:hover {{
-                    background-color: {COLOR_DIVIDER};
-                }}
-            """)
-            left_layout.addWidget(self.contacts_list)
-            
-            main_layout.addWidget(left_panel)
-            
-            self.right_panel = QWidget()
-            self.right_panel.setStyleSheet(f"background-color: {COLOR_BACKGROUND};")
-            right_layout = QVBoxLayout(self.right_panel)
-            right_layout.setContentsMargins(0, 0, 0, 0)
-            right_layout.setSpacing(0)
-            
-            self.placeholder_widget = QWidget()
-            placeholder_layout = QVBoxLayout(self.placeholder_widget)
-            placeholder_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            
-            placeholder_icon = QLabel("💬")
-            placeholder_icon.setStyleSheet("font-size: 64px;")
-            placeholder_layout.addWidget(placeholder_icon)
-            
-            placeholder_text = QLabel("Выберите чат для начала общения")
-            placeholder_text.setStyleSheet(f"color: {COLOR_TEXT_PRIMARY}; font-size: 18px; font-family: {FONT_FAMILY};")
-            placeholder_layout.addWidget(placeholder_text)
-            
-            right_layout.addWidget(self.placeholder_widget)
-            main_layout.addWidget(self.right_panel, 1)
-            
-            self.contacts_list.itemClicked.connect(self.open_chat)
-            
-            print("✅ UI инициализирован")
-            
-        except Exception as e:
-            print(f"❌ Ошибка init_ui: {e}")
-            import traceback
-            traceback.print_exc()
-            raise
-    
+        self.setWindowTitle(f"Ten Dem | {self.current_user.name}")
+        self.setMinimumSize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
+        self.resize(1280, 820)
+        self.setStyleSheet(f"background-color: {self.colors['bg_primary']};")
+
+        central = QWidget()
+        self.setCentralWidget(central)
+        layout = QHBoxLayout(central)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        layout.addWidget(self._create_sidebar())
+        layout.addWidget(self._create_right_panel(), 1)
+
+    def _create_sidebar(self):
+        panel = QWidget()
+        panel.setFixedWidth(LEFT_PANEL_WIDTH)
+        panel.setStyleSheet(
+            f"QWidget {{ background-color: {self.colors['bg_secondary']}; border-right: 1px solid {self.colors['divider']}; }}"
+        )
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(20, 20, 20, 16)
+        title = QLabel("Ten Dem")
+        title.setFont(QFont(FONT_FAMILY, 20, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {self.colors['text_primary']};")
+        header.addWidget(title)
+        header.addStretch()
+
+        settings_btn = QPushButton()
+        settings_btn.setFixedSize(40, 40)
+        settings_btn.setIcon(QIcon("assets/icons/settings.svg"))
+        settings_btn.setIconSize(QSize(18, 18))
+        settings_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {self.colors['icon_default']};
+                border: none;
+                border-radius: 12px;
+                font-size: 18px;
+            }}
+            QPushButton:hover {{
+                background-color: {self.colors['bg_tertiary']};
+                color: {self.colors['text_primary']};
+            }}
+            """
+        )
+        settings_btn.clicked.connect(self.open_settings)
+        header.addWidget(settings_btn)
+        layout.addLayout(header)
+
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Поиск")
+        self.search_input.textChanged.connect(self.filter_contacts)
+        self.search_input.setStyleSheet(
+            f"""
+            QLineEdit {{
+                margin: 0 16px 16px 16px;
+                padding: 12px 16px;
+                border: 1px solid {self.colors['divider']};
+                border-radius: 18px;
+                background-color: {self.colors['bg_tertiary']};
+                color: {self.colors['text_primary']};
+                font-size: 14px;
+            }}
+            """
+        )
+        layout.addWidget(self.search_input)
+
+        self.contacts_list = QListWidget()
+        self.contacts_list.itemClicked.connect(self.open_chat)
+        self.contacts_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.contacts_list.customContextMenuRequested.connect(self.open_contact_menu)
+        self.contacts_list.setStyleSheet(
+            f"""
+            QListWidget {{
+                background-color: transparent;
+                border: none;
+                outline: none;
+            }}
+            QListWidget::item {{
+                margin: 0 8px 6px 8px;
+                border-radius: 14px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {self.colors['bg_tertiary']};
+            }}
+            QListWidget::item:hover {{
+                background-color: {self.colors['bg_tertiary']};
+            }}
+            """
+        )
+        layout.addWidget(self.contacts_list, 1)
+        return panel
+
+    def _create_right_panel(self):
+        self.right_panel = QWidget()
+        self.right_panel.setStyleSheet(f"background-color: {self.colors['bg_primary']};")
+        right_layout = QVBoxLayout(self.right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        self.placeholder = QWidget()
+        placeholder_layout = QVBoxLayout(self.placeholder)
+        placeholder_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon = QLabel("TD")
+        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon.setFixedSize(96, 96)
+        icon.setStyleSheet(
+            f"""
+            QLabel {{
+                background-color: {self.colors['accent_primary']};
+                color: white;
+                border-radius: 48px;
+                font-size: 30px;
+                font-weight: 700;
+            }}
+            """
+        )
+        text = QLabel("Выберите чат, чтобы начать общение")
+        text.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 18px;")
+        placeholder_layout.addWidget(icon)
+        placeholder_layout.addSpacing(18)
+        placeholder_layout.addWidget(text)
+        right_layout.addWidget(self.placeholder)
+        return self.right_panel
+
     def open_settings(self):
-        """Открывает окно настроек."""
-        from src.ui.settings_window import SettingsWindow
         self.settings_window = SettingsWindow(self.current_user, self)
         self.settings_window.settings_saved.connect(self.on_settings_saved)
-        self.settings_window.show()
-    
+        self.settings_window.exec()
+
     def on_settings_saved(self, settings):
-        """Обрабатывает сохранение настроек."""
-        print(f"✅ Настройки сохранены: {settings}")
-    
+        self.current_user.name = settings.get("name", self.current_user.name)
+        self.current_user.theme = settings.get("theme", getattr(self.current_user, "theme", "dark"))
+        self.colors = get_theme_colors(self.current_user.theme)
+        self.setWindowTitle(f"Ten Dem | {self.current_user.name}")
+        old = self.takeCentralWidget()
+        if old:
+            old.deleteLater()
+        self.init_ui()
+        self.load_contacts()
+
     def load_contacts(self):
-        try:
-            print("🟢 Загрузка контактов...")
-            if self.contacts_list is None:
-                return
-            self.contacts_list.clear()
-            
-            import threading
-            result = [None]
-            error = [None]
-            
-            def fetch_users():
-                try:
-                    all_users = get_all_users()
-                    result[0] = all_users
-                except Exception as e:
-                    error[0] = e
-            
-            thread = threading.Thread(target=fetch_users)
-            thread.daemon = True
-            thread.start()
-            thread.join(timeout=10)
-            
-            if error[0]:
-                print(f"⚠️ Firebase не ответил: {error[0]}")
-                self._show_test_contacts()
-                return
-            
-            if result[0]:
-                all_users = result[0]
-                for user_data in all_users:
-                    if user_data['uid'] == self.current_user.uid:
-                        continue
-                    user = User.from_dict(user_data, user_data['uid'])
-                    item = QListWidgetItem(self.contacts_list)
-                    contact_widget = ContactItem(user)
-                    item.setSizeHint(contact_widget.sizeHint())
-                    self.contacts_list.addItem(item)
-                    self.contacts_list.setItemWidget(item, contact_widget)
-                
-                print(f"✅ Загружено контактов: {len(all_users) - 1}")
-            else:
-                self._show_test_contacts()
-                
-        except Exception as e:
-            print(f"❌ Ошибка load_contacts: {e}")
-            self._show_test_contacts()
-    
-    def _show_test_contacts(self):
-        print("🧪 Показываем тестовые контакты...")
-        
-        test_users = [
-            {'uid': 'test1', 'name': 'Алексей', 'phone': '+79991111111', 'status': 'online'},
-            {'uid': 'test2', 'name': 'Мария', 'phone': '+79992222222', 'status': 'offline'},
-            {'uid': 'test3', 'name': 'Дмитрий', 'phone': '+79993333333', 'status': 'online'},
-        ]
-        
-        for user_data in test_users:
-            user = User.from_dict(user_data, user_data['uid'])
-            item = QListWidgetItem(self.contacts_list)
-            contact_widget = ContactItem(user)
-            item.setSizeHint(contact_widget.sizeHint())
+        self.contacts_list.clear()
+        self.contact_widgets.clear()
+        summaries = get_chat_summaries(self.current_user.uid)
+        all_users = get_all_users()
+        if not all_users:
+            all_users = [
+                {"uid": "demo-alex", "name": "Алексей", "phone": "+79991111111", "status": "online"},
+                {"uid": "demo-maria", "name": "Мария", "phone": "+79992222222", "status": "offline"},
+            ]
+        for user_data in all_users:
+            if user_data.get("uid") == self.current_user.uid:
+                continue
+            user = User.from_dict(user_data, user_data.get("uid"))
+            summary = summaries.get(user.uid, {})
+            item = QListWidgetItem()
+            widget = ContactItem(
+                user,
+                last_message=summary.get("last_message", "Начните разговор"),
+                unread_count=summary.get("unread_count", 0),
+                timestamp=summary.get("timestamp"),
+            )
+            item.setSizeHint(widget.sizeHint())
             self.contacts_list.addItem(item)
-            self.contacts_list.setItemWidget(item, contact_widget)
-        
-        print(f"✅ Показано тестовых контактов: {len(test_users)}")
-    
-    def filter_contacts(self, text):
-        try:
-            if self.contacts_list is None:
-                return
-            for i in range(self.contacts_list.count()):
-                item = self.contacts_list.item(i)
-                widget = self.contacts_list.itemWidget(item)
-                if widget and hasattr(widget, 'user'):
-                    item.setHidden(text.lower() not in widget.user.name.lower())
-        except Exception:
-            pass
-    
-    def open_chat(self, item):
-        try:
-            contact_widget = self.contacts_list.itemWidget(item)
-            if not contact_widget or not hasattr(contact_widget, 'user'):
-                return
-            
-            contact = contact_widget.user
-            
-            if not contact.name:
-                contact.name = "Пользователь"
-            
-            if self.placeholder_widget:
-                self.placeholder_widget.deleteLater()
-                self.placeholder_widget = None
-            
-            if self.current_chat_widget:
-                try:
-                    self.current_chat_widget.deleteLater()
-                except RuntimeError:
-                    pass
-                self.current_chat_widget = None
-            
-            self.current_chat_widget = ChatWidget(self.current_user, contact)
-            right_layout = self.right_panel.layout()
-            right_layout.addWidget(self.current_chat_widget)
-            
-            print(f"✅ Чат открыт: {contact.name}")
-            
-        except Exception as e:
-            print(f"❌ Ошибка open_chat: {e}")
-            import traceback
-            traceback.print_exc()
-    
+            self.contacts_list.setItemWidget(item, widget)
+            self.contact_widgets[user.uid] = widget
+
+    def filter_contacts(self, text: str):
+        text = text.strip().lower()
+        for index in range(self.contacts_list.count()):
+            item = self.contacts_list.item(index)
+            widget = self.contacts_list.itemWidget(item)
+            name = getattr(getattr(widget, "user", None), "name", "").lower()
+            item.setHidden(text not in name)
+
+    def open_chat(self, item: QListWidgetItem):
+        contact_widget = self.contacts_list.itemWidget(item)
+        if not contact_widget:
+            return
+        if self.placeholder is not None:
+            self.placeholder.deleteLater()
+            self.placeholder = None
+        if self.current_chat_widget is not None:
+            self.current_chat_widget.deleteLater()
+        self.current_chat_widget = ChatWidget(self.current_user, contact_widget.user, self.right_panel)
+        self.current_chat_widget.chat_updated.connect(self.refresh_contacts)
+        self.right_panel.layout().addWidget(self.current_chat_widget)
+
+    def refresh_contacts(self, _contact_uid: str = ""):
+        if not _contact_uid or _contact_uid not in self.contact_widgets:
+            self.load_contacts()
+            return
+        from src.database.messages_db import get_chat_summaries
+
+        summary = get_chat_summaries(self.current_user.uid).get(_contact_uid, {})
+        widget = self.contact_widgets.get(_contact_uid)
+        if widget:
+            widget.update_preview(
+                last_message=summary.get("last_message", widget.last_message),
+                timestamp=summary.get("timestamp", widget.timestamp),
+                unread_count=summary.get("unread_count", widget.unread_count),
+            )
+
+    def open_contact_menu(self, pos):
+        item = self.contacts_list.itemAt(pos)
+        if not item:
+            return
+        widget = self.contacts_list.itemWidget(item)
+        if not widget:
+            return
+        from PyQt6.QtWidgets import QMenu
+
+        menu = QMenu(self)
+        menu.setStyleSheet(
+            f"""
+            QMenu {{ background-color: {self.colors['bg_secondary']}; color: {self.colors['text_primary']}; border: 1px solid {self.colors['divider']}; }}
+            QMenu::item {{ padding: 8px 16px; }}
+            QMenu::item:selected {{ background-color: {self.colors['bg_tertiary']}; }}
+            """
+        )
+        info_action = menu.addAction("Информация о контакте")
+        open_action = menu.addAction("Открыть чат")
+        action = menu.exec(self.contacts_list.mapToGlobal(pos))
+        if action == open_action:
+            self.open_chat(item)
+        elif action == info_action:
+            ContactInfoDialog(self.current_user, widget.user, self).exec()
+
     def closeEvent(self, event):
-        try:
-            set_online_status(self.current_user.uid, "offline")
-            if self.current_chat_widget:
-                self.current_chat_widget.close()
-            event.accept()
-        except Exception:
-            event.accept()
+        set_online_status(self.current_user.uid, "offline")
+        event.accept()

@@ -12,10 +12,10 @@ BG_PRIMARY = '#0A0A0A'        # Основной фон приложения
 BG_SECONDARY = '#141414'      # Панели, карточки
 BG_TERTIARY = '#1E1E1E'       # Поля ввода, ховеры
 
-# Акценты (фиолетовый)
-ACCENT_PRIMARY = '#7C3AED'    # Кнопки, свои сообщения
-ACCENT_HOVER = '#8B5CF6'      # Наведение
-ACCENT_PRESSED = '#6D28D9'    # Нажатие
+# Акценты (чистый сине-голубой)
+ACCENT_PRIMARY = '#2F80ED'    # Кнопки, свои сообщения
+ACCENT_HOVER = '#4393F4'      # Наведение
+ACCENT_PRESSED = '#256FD0'    # Нажатие
 
 # Текст
 TEXT_PRIMARY = '#FFFFFF'      # Основной текст
@@ -24,7 +24,7 @@ TEXT_TERTIARY = '#6B6B6B'     # Время, метки
 TEXT_ON_ACCENT = '#FFFFFF'    # Текст на акценте
 
 # Сообщения
-MESSAGE_OWN_BG = '#7C3AED'    # Свои сообщения
+MESSAGE_OWN_BG = '#2F80ED'    # Свои сообщения
 MESSAGE_OWN_TEXT = '#FFFFFF'
 MESSAGE_OTHER_BG = '#1E1E1E'  # Чужие сообщения
 MESSAGE_OTHER_TEXT = '#FFFFFF'

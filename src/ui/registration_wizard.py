@@ -1,226 +1,138 @@
-"""
-Мастер регистрации для Ten Dem
-"""
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QLineEdit, QPushButton, QStackedWidget, 
-                             QFrame, QProgressBar)
+"""Registration wizard with real validation."""
+from __future__ import annotations
+
+import re
+
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QLabel,
+    QLineEdit,
+    QProgressBar,
+    QPushButton,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from src.database.auth_manager import auth_manager
+from src.database.users_db import get_user_by_phone
 from src.ui.legal_agreement import LegalAgreementWindow
 
 
-# ==================== ЭТАП 1: ТЕЛЕФОН (РЕГИСТРАЦИЯ) ====================
+PROFANITY_PARTS = ("хуй", "хуе", "хуй", "еб", "пизд", "бля", "сук", "fuck", "shit")
+
+
+def contains_profanity(value: str) -> bool:
+    lowered = (value or "").lower()
+    return any(part in lowered for part in PROFANITY_PARTS)
+
+
+def primary_button_style() -> str:
+    return """
+    QPushButton {
+        background-color: #10B981;
+        color: white;
+        border: none;
+        border-radius: 16px;
+        font-size: 15px;
+        font-weight: 600;
+        text-align: center;
+        padding: 12px;
+    }
+    QPushButton:hover:!disabled { background-color: #059669; }
+    QPushButton:disabled { background-color: rgba(16,185,129,0.35); color: rgba(255,255,255,0.75); }
+    """
+
+
+def secondary_button_style() -> str:
+    return """
+    QPushButton {
+        background-color: #23232B;
+        color: white;
+        border: 1px solid #31313A;
+        border-radius: 16px;
+        font-size: 15px;
+        font-weight: 600;
+        text-align: center;
+        padding: 12px;
+    }
+    QPushButton:hover:!disabled { background-color: #2A2A34; }
+    QPushButton:disabled { background-color: rgba(35,35,43,0.45); color: rgba(255,255,255,0.55); }
+    """
+
+
+def input_style() -> str:
+    return """
+    QLineEdit {
+        background-color: #17171D;
+        color: white;
+        border: 1px solid #2F2F38;
+        border-radius: 16px;
+        padding: 16px 18px;
+        font-size: 16px;
+    }
+    """
+
+
 class PhoneStep(QWidget):
-    next_step = pyqtSignal(str)
-    go_to_login = pyqtSignal()
-    
+    next_step = pyqtSignal(str, bool)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.init_ui()
-    
-    def init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(80, 100, 80, 80)
-        main_layout.setSpacing(24)
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        
-        logo_label = QLabel("Ten Dem")
-        logo_label.setStyleSheet("color: #10B981; font-size: 32px; font-weight: 600;")
-        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(logo_label)
-        
-        main_layout.addSpacing(60)
-        
-        title = QLabel("Введите номер телефона")
-        title.setStyleSheet("color: #FFFFFF; font-size: 18px; font-weight: 500;")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(title)
-        
-        self.phone_input = QLineEdit()
-        self.phone_input.setPlaceholderText("+7 (999) 999-99-99")
-        self.phone_input.setStyleSheet("""
-            background-color: #1A1B1E;
-            color: #FFFFFF;
-            border: none;
-            border-radius: 10px;
-            padding: 14px 18px;
-            font-size: 16px;
-        """)
-        self.phone_input.setMaxLength(18)
-        self.phone_input.textChanged.connect(self.format_phone)
-        main_layout.addWidget(self.phone_input)
-        
-        self.error_label = QLabel()
-        self.error_label.setStyleSheet("color: #EF4444; font-size: 12px;")
-        self.error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.error_label)
-        
-        self.register_btn = QPushButton("Зарегистрироваться")
-        self.register_btn.setStyleSheet("""
-            background-color: #374151;
-            color: #FFFFFF;
-            border: none;
-            border-radius: 10px;
-            padding: 14px 28px;
-            font-size: 15px;
-            font-weight: 500;
-        """)
-        self.register_btn.setMinimumHeight(48)
-        self.register_btn.clicked.connect(self.on_register)
-        main_layout.addWidget(self.register_btn)
-        
-        login_layout = QHBoxLayout()
-        login_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        login_label = QLabel("Уже есть аккаунт?")
-        login_label.setStyleSheet("color: #6B7280; font-size: 13px;")
-        login_layout.addWidget(login_label)
-        login_btn = QLabel("Войти")
-        login_btn.setStyleSheet("color: #10B981; font-size: 13px; font-weight: 500;")
-        login_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        login_btn.mousePressEvent = lambda e: self.go_to_login.emit()
-        login_layout.addWidget(login_btn)
-        main_layout.addLayout(login_layout)
-        
-        skip_btn = QPushButton("Пропустить")
-        skip_btn.setStyleSheet("""
-            background-color: transparent;
-            color: #6B7280;
-            border: none;
-            padding: 12px 24px;
-            font-size: 13px;
-        """)
-        skip_btn.setMinimumHeight(44)
-        skip_btn.clicked.connect(self.on_skip)
-        main_layout.addWidget(skip_btn)
-        
-        main_layout.addStretch()
-    
-    def format_phone(self, text):
-        digits = ''.join(c for c in text if c.isdigit())
-        if digits.startswith('8'):
-            digits = '7' + digits[1:]
-        if not digits.startswith('7'):
-            digits = '7' + digits
-        digits = digits[:11]
-        
-        if len(digits) <= 1:
-            formatted = f"+{digits}"
-        elif len(digits) <= 4:
-            formatted = f"+7 ({digits[1:]}"
-        elif len(digits) <= 7:
-            formatted = f"+7 ({digits[1:4]}) {digits[4:]}"
-        elif len(digits) <= 9:
-            formatted = f"+7 ({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
-        else:
-            formatted = f"+7 ({digits[1:4]}) {digits[4:7]}-{digits[7:9]}-{digits[9:]}"
-        
-        if self.phone_input.text() != formatted:
-            self.phone_input.setText(formatted)
-            self.phone_input.setCursorPosition(len(formatted))
-    
-    def on_register(self):
-        phone = ''.join(c for c in self.phone_input.text() if c.isdigit())
-        if len(phone) != 11:
-            self.error_label.setText("Введите корректный номер")
-            return
-        self.error_label.clear()
-        self.next_step.emit(phone)
-    
-    def on_skip(self):
-        self.next_step.emit("skip")
 
-
-# ==================== ЭТАП 1Б: ТЕЛЕФОН (ВХОД) ====================
-class LoginStep(QWidget):
-    next_step = pyqtSignal(str)
-    go_to_registration = pyqtSignal()
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.init_ui()
-    
     def init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(80, 100, 80, 80)
-        main_layout.setSpacing(24)
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        
-        logo_label = QLabel("Ten Dem")
-        logo_label.setStyleSheet("color: #10B981; font-size: 32px; font-weight: 600;")
-        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(logo_label)
-        
-        main_layout.addSpacing(60)
-        
-        title = QLabel("Вход в аккаунт")
-        title.setStyleSheet("color: #FFFFFF; font-size: 18px; font-weight: 500;")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(72, 90, 72, 72)
+        layout.setSpacing(18)
+
+        title = QLabel("Ten Dem")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(title)
-        
-        subtitle = QLabel("Введите номер телефона для входа")
-        subtitle.setStyleSheet("color: #6B7280; font-size: 14px;")
+        title.setStyleSheet("color: #FFFFFF; font-size: 34px; font-weight: 700;")
+        layout.addWidget(title)
+
+        subtitle = QLabel("Введите номер телефона")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(subtitle)
-        
-        main_layout.addSpacing(20)
-        
+        subtitle.setStyleSheet("color: #9CA3AF; font-size: 15px;")
+        layout.addWidget(subtitle)
+
         self.phone_input = QLineEdit()
         self.phone_input.setPlaceholderText("+7 (999) 999-99-99")
-        self.phone_input.setStyleSheet("""
-            background-color: #1A1B1E;
-            color: #FFFFFF;
-            border: none;
-            border-radius: 10px;
-            padding: 14px 18px;
-            font-size: 16px;
-        """)
-        self.phone_input.setMaxLength(18)
+        self.phone_input.setStyleSheet(input_style())
         self.phone_input.textChanged.connect(self.format_phone)
-        main_layout.addWidget(self.phone_input)
-        
+        self.phone_input.textChanged.connect(self.update_buttons)
+        layout.addWidget(self.phone_input)
+
         self.error_label = QLabel()
-        self.error_label.setStyleSheet("color: #EF4444; font-size: 12px;")
         self.error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.error_label)
-        
+        self.error_label.setStyleSheet("color: #EF4444; font-size: 12px;")
+        layout.addWidget(self.error_label)
+
+        self.register_btn = QPushButton("Создать аккаунт")
+        self.register_btn.setStyleSheet(primary_button_style())
+        self.register_btn.setEnabled(False)
+        self.register_btn.clicked.connect(lambda: self.submit(False))
+        layout.addWidget(self.register_btn)
+
         self.login_btn = QPushButton("Войти")
-        self.login_btn.setStyleSheet("""
-            background-color: #10B981;
-            color: #FFFFFF;
-            border: none;
-            border-radius: 10px;
-            padding: 14px 28px;
-            font-size: 15px;
-            font-weight: 500;
-        """)
-        self.login_btn.setMinimumHeight(48)
-        self.login_btn.clicked.connect(self.on_login)
-        main_layout.addWidget(self.login_btn)
-        
-        register_layout = QHBoxLayout()
-        register_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        register_label = QLabel("Нет аккаунта?")
-        register_label.setStyleSheet("color: #6B7280; font-size: 13px;")
-        register_layout.addWidget(register_label)
-        register_btn = QLabel("Зарегистрироваться")
-        register_btn.setStyleSheet("color: #10B981; font-size: 13px; font-weight: 500;")
-        register_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        register_btn.mousePressEvent = lambda e: self.go_to_registration.emit()
-        register_layout.addWidget(register_btn)
-        main_layout.addLayout(register_layout)
-        
-        main_layout.addStretch()
-    
-    def format_phone(self, text):
-        digits = ''.join(c for c in text if c.isdigit())
-        if digits.startswith('8'):
-            digits = '7' + digits[1:]
-        if not digits.startswith('7'):
-            digits = '7' + digits
+        self.login_btn.setStyleSheet(secondary_button_style())
+        self.login_btn.setEnabled(False)
+        self.login_btn.clicked.connect(lambda: self.submit(True))
+        layout.addWidget(self.login_btn)
+
+        skip_btn = QPushButton("Тестовый вход")
+        skip_btn.setStyleSheet("background: transparent; color: #9CA3AF; border: none; padding: 10px;")
+        skip_btn.clicked.connect(lambda: self.next_step.emit("skip", False))
+        layout.addWidget(skip_btn)
+        layout.addStretch()
+
+    def format_phone(self, text: str):
+        digits = "".join(c for c in text if c.isdigit())
+        if digits.startswith("8"):
+            digits = "7" + digits[1:]
+        if digits and not digits.startswith("7"):
+            digits = "7" + digits
         digits = digits[:11]
-        
         if len(digits) <= 1:
             formatted = f"+{digits}"
         elif len(digits) <= 4:
@@ -231,685 +143,405 @@ class LoginStep(QWidget):
             formatted = f"+7 ({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
         else:
             formatted = f"+7 ({digits[1:4]}) {digits[4:7]}-{digits[7:9]}-{digits[9:]}"
-        
         if self.phone_input.text() != formatted:
             self.phone_input.setText(formatted)
             self.phone_input.setCursorPosition(len(formatted))
-    
-    def on_login(self):
-        phone = ''.join(c for c in self.phone_input.text() if c.isdigit())
+
+    def update_buttons(self):
+        is_valid = len("".join(c for c in self.phone_input.text() if c.isdigit())) == 11
+        self.register_btn.setEnabled(is_valid)
+        self.login_btn.setEnabled(is_valid)
+
+    def submit(self, is_login: bool):
+        phone = "".join(c for c in self.phone_input.text() if c.isdigit())
         if len(phone) != 11:
             self.error_label.setText("Введите корректный номер")
             return
         self.error_label.clear()
-        self.next_step.emit(phone)
+        self.next_step.emit(phone, is_login)
 
 
-# ==================== ЭТАП 2: КОД ====================
 class CodeStep(QWidget):
-    next_step = pyqtSignal(str)
+    verified = pyqtSignal()
     back_step = pyqtSignal()
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.verification_id = None
+        self.verification_id = ""
         self.phone = ""
-        self.is_login_mode = False
         self.init_ui()
-    
+
     def init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(80, 100, 80, 80)
-        main_layout.setSpacing(24)
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        
-        lock_icon = QLabel("🔐")
-        lock_icon.setStyleSheet("font-size: 40px;")
-        lock_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(lock_icon)
-        
-        title = QLabel("Код подтверждения")
-        title.setStyleSheet("color: #FFFFFF; font-size: 18px; font-weight: 500;")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(72, 90, 72, 72)
+        layout.setSpacing(18)
+
+        title = QLabel("Подтверждение номера")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(title)
-        
+        title.setStyleSheet("color: white; font-size: 24px; font-weight: 700;")
+        layout.addWidget(title)
+
         self.subtitle = QLabel("")
-        self.subtitle.setStyleSheet("color: #6B7280; font-size: 13px;")
         self.subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.subtitle)
-        
-        change_btn = QLabel("Изменить номер")
-        change_btn.setStyleSheet("color: #10B981; font-size: 13px;")
-        change_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        change_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        change_btn.mousePressEvent = lambda e: self.back_step.emit()
-        main_layout.addWidget(change_btn)
-        
-        main_layout.addSpacing(30)
-        
-        code_widget = QWidget()
-        code_layout = QHBoxLayout(code_widget)
-        code_layout.setSpacing(12)
-        code_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        self.code_inputs = []
-        for i in range(6):
-            inp = QLineEdit()
-            inp.setMaxLength(1)
-            inp.setFixedSize(48, 60)
-            inp.setStyleSheet("""
-                background-color: #1A1B1E;
-                color: #FFFFFF;
-                border: none;
-                border-radius: 10px;
-                font-size: 22px;
-                font-weight: 500;
-                padding: 0px;
-            """)
-            inp.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            inp.textChanged.connect(lambda text, idx=i: self.on_code_changed(text, idx))
-            inp.installEventFilter(self)
-            code_layout.addWidget(inp)
-            self.code_inputs.append(inp)
-        
-        main_layout.addWidget(code_widget)
-        
-        self.error_label = QLabel()
-        self.error_label.setStyleSheet("color: #EF4444; font-size: 12px;")
-        self.error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.error_label)
-        
-        main_layout.addSpacing(20)
-        
-        self.timer_label = QLabel("Отправить код повторно через 60 сек")
-        self.timer_label.setStyleSheet("color: #6B7280; font-size: 12px;")
+        self.subtitle.setStyleSheet("color: #9CA3AF; font-size: 13px;")
+        layout.addWidget(self.subtitle)
+
+        self.code_input = QLineEdit()
+        self.code_input.setPlaceholderText("6 цифр из SMS")
+        self.code_input.setStyleSheet(input_style())
+        self.code_input.setMaxLength(6)
+        self.code_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.code_input.textChanged.connect(self.on_text_changed)
+        layout.addWidget(self.code_input)
+
+        self.timer_label = QLabel("")
         self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.timer_label)
-        
-        self.continue_btn = QPushButton("Продолжить")
-        self.continue_btn.setStyleSheet("""
-            background-color: #374151;
-            color: #FFFFFF;
-            border: none;
-            border-radius: 10px;
-            padding: 14px 28px;
-            font-size: 15px;
-            font-weight: 500;
-        """)
-        self.continue_btn.setMinimumHeight(48)
-        self.continue_btn.setMaximumWidth(280)
+        self.timer_label.setStyleSheet("color: #9CA3AF; font-size: 12px;")
+        layout.addWidget(self.timer_label)
+
+        self.error_label = QLabel()
+        self.error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.error_label.setStyleSheet("color: #EF4444; font-size: 12px;")
+        layout.addWidget(self.error_label)
+
+        self.continue_btn = QPushButton("Подтвердить")
         self.continue_btn.setEnabled(False)
-        self.continue_btn.clicked.connect(self.on_continue)
-        main_layout.addWidget(self.continue_btn, alignment=Qt.AlignmentFlag.AlignCenter)
-        
-        main_layout.addStretch()
-        
+        self.continue_btn.setStyleSheet(primary_button_style())
+        self.continue_btn.clicked.connect(self.submit)
+        layout.addWidget(self.continue_btn)
+
+        back_btn = QPushButton("Назад")
+        back_btn.setStyleSheet(secondary_button_style())
+        back_btn.clicked.connect(self.back_step.emit)
+        layout.addWidget(back_btn)
+        layout.addStretch()
+
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_timer)
         self.seconds_left = 60
-    
-    def set_phone(self, phone):
+
+    def setup(self, phone: str, verification_id: str):
         self.phone = phone
-        masked = f"+7 {phone[2:5]} {phone[5:8]} {phone[8:10]} {phone[10:]}"
-        self.subtitle.setText(f"Код отправлен на {masked}")
-    
-    def set_verification_id(self, vid):
-        self.verification_id = vid
-    
-    def set_login_mode(self, is_login):
-        self.is_login_mode = is_login
-    
-    def on_code_changed(self, text, index):
-        if text and not text.isdigit():
-            self.code_inputs[index].setText("")
-            return
-        if text:
-            if index < 5:
-                self.code_inputs[index + 1].setFocus()
-        self.check_code()
-    
-    def check_code(self):
-        code = ''.join(inp.text() for inp in self.code_inputs)
-        self.continue_btn.setEnabled(len(code) == 6 and code.isdigit())
-    
-    def update_timer(self):
-        self.seconds_left -= 1
-        if self.seconds_left > 0:
-            self.timer_label.setText(f"Отправить код повторно через {self.seconds_left} сек")
-        else:
-            self.timer.stop()
-            self.timer_label.setText("Отправить код повторно")
-            self.timer_label.setStyleSheet("color: #10B981; font-size: 12px;")
-    
-    def start_timer(self):
+        self.verification_id = verification_id
+        self.subtitle.setText(f"Код отправлен на +{phone}")
+        self.code_input.clear()
+        self.error_label.clear()
         self.seconds_left = 60
         self.timer.start(1000)
         self.update_timer()
-    
-    def on_continue(self):
-        code = ''.join(inp.text() for inp in self.code_inputs)
-        success, message, phone = auth_manager.verify_code(self.verification_id, code)
-        
+
+    def update_timer(self):
+        self.seconds_left -= 1
+        if self.seconds_left > 0:
+            self.timer_label.setText(f"Повторная отправка через {self.seconds_left} сек")
+        else:
+            self.timer.stop()
+            self.timer_label.setText("Можно запросить код снова")
+
+    def on_text_changed(self, text: str):
+        self.continue_btn.setEnabled(len(text.strip()) == 6 and text.strip().isdigit())
+
+    def submit(self):
+        success, message, _phone = auth_manager.verify_code(self.verification_id, self.code_input.text().strip())
         if success:
-            mode = "login" if self.is_login_mode else "register"
-            self.next_step.emit(f"{mode}:{phone}")
+            self.verified.emit()
         else:
             self.error_label.setText(message)
-    
-    def eventFilter(self, obj, event):
-        from PyQt6.QtCore import QEvent
-        if obj in self.code_inputs and event.type() == QEvent.Type.KeyPress:
-            if event.key() == Qt.Key.Key_Backspace and not obj.text():
-                index = self.code_inputs.index(obj)
-                if index > 0:
-                    self.code_inputs[index - 1].setFocus()
-        return super().eventFilter(obj, event)
 
 
-# ==================== ЭТАП 3: ИМЯ ====================
 class NameStep(QWidget):
     next_step = pyqtSignal(dict)
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.init_ui()
-    
+
     def init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(80, 100, 80, 80)
-        main_layout.setSpacing(24)
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        
-        title = QLabel("Как к вам обращаться?")
-        title.setStyleSheet("color: #FFFFFF; font-size: 18px; font-weight: 500;")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(72, 90, 72, 72)
+        layout.setSpacing(18)
+
+        title = QLabel("Как вас зовут?")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(title)
-        
-        main_layout.addSpacing(30)
-        
+        title.setStyleSheet("color: white; font-size: 24px; font-weight: 700;")
+        layout.addWidget(title)
+
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Имя")
-        self.name_input.setMaxLength(20)
-        self.name_input.setStyleSheet("""
-            background-color: #1A1B1E;
-            color: #FFFFFF;
-            border: none;
-            border-radius: 10px;
-            padding: 14px 18px;
-            font-size: 15px;
-        """)
+        self.name_input.setStyleSheet(input_style())
         self.name_input.textChanged.connect(self.validate)
-        main_layout.addWidget(self.name_input)
-        
+        layout.addWidget(self.name_input)
+
         self.surname_input = QLineEdit()
         self.surname_input.setPlaceholderText("Фамилия")
-        self.surname_input.setMaxLength(20)
-        self.surname_input.setStyleSheet("""
-            background-color: #1A1B1E;
-            color: #FFFFFF;
-            border: none;
-            border-radius: 10px;
-            padding: 14px 18px;
-            font-size: 15px;
-        """)
+        self.surname_input.setStyleSheet(input_style())
         self.surname_input.textChanged.connect(self.validate)
-        main_layout.addWidget(self.surname_input)
-        
+        layout.addWidget(self.surname_input)
+
         self.error_label = QLabel()
-        self.error_label.setStyleSheet("color: #EF4444; font-size: 12px;")
         self.error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.error_label)
-        
-        main_layout.addSpacing(10)
-        
+        self.error_label.setStyleSheet("color: #EF4444; font-size: 12px;")
+        layout.addWidget(self.error_label)
+
         self.continue_btn = QPushButton("Продолжить")
         self.continue_btn.setEnabled(False)
-        self.continue_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1F2937;
-                color: #6B7280;
-                border: none;
-                border-radius: 10px;
-                padding: 14px 28px;
-                font-size: 15px;
-                font-weight: 500;
-            }
-            QPushButton:hover:!disabled {
-                background-color: #374151;
-            }
-            QPushButton:disabled {
-                background-color: #1F2937;
-                color: #6B7280;
-            }
-            QPushButton:!disabled {
-                background-color: #10B981;
-                color: #FFFFFF;
-            }
-            QPushButton:!disabled:hover {
-                background-color: #059669;
-            }
-            QPushButton:!disabled:pressed {
-                background-color: #047857;
-            }
-        """)
-        self.continue_btn.setMinimumHeight(48)
-        self.continue_btn.clicked.connect(self.on_continue)
-        main_layout.addWidget(self.continue_btn)
-        
-        main_layout.addStretch()
-    
+        self.continue_btn.setStyleSheet(primary_button_style())
+        self.continue_btn.clicked.connect(self.submit)
+        layout.addWidget(self.continue_btn)
+        layout.addStretch()
+
     def validate(self):
         name = self.name_input.text().strip()
         surname = self.surname_input.text().strip()
-        
-        import re
-        
-        name_valid = False
-        if 2 <= len(name) <= 20:
-            if re.match(r'^[a-zA-Zа-яА-ЯёЁ]+$', name):
-                name_valid = True
-        
-        surname_valid = False
-        if 2 <= len(surname) <= 20:
-            if re.match(r'^[a-zA-Zа-яА-ЯёЁ]+$', surname):
-                surname_valid = True
-        
-        self.continue_btn.setEnabled(name_valid and surname_valid)
-        
-        if name_valid and surname_valid:
-            self.error_label.setText("")
-    
-    def on_continue(self):
+        valid = bool(re.fullmatch(r"[A-Za-zА-Яа-яЁё]{2,20}", name)) and bool(
+            re.fullmatch(r"[A-Za-zА-Яа-яЁё]{2,20}", surname)
+        )
+        valid = valid and not contains_profanity(name) and not contains_profanity(surname)
+        self.continue_btn.setEnabled(valid)
+
+    def submit(self):
         name = self.name_input.text().strip()
         surname = self.surname_input.text().strip()
-        
-        import re
-        
-        if not re.match(r'^[a-zA-Zа-яА-ЯёЁ]{2,20}$', name):
-            self.error_label.setText("Имя должно содержать только буквы (2-20)")
+        if not re.fullmatch(r"[A-Za-zА-Яа-яЁё]{2,20}", name):
+            self.error_label.setText("Имя должно содержать только буквы")
             return
-        
-        if not re.match(r'^[a-zA-Zа-яА-ЯёЁ]{2,20}$', surname):
-            self.error_label.setText("Фамилия должна содержать только буквы (2-20)")
+        if not re.fullmatch(r"[A-Za-zА-Яа-яЁё]{2,20}", surname):
+            self.error_label.setText("Фамилия должна содержать только буквы")
             return
-        
-        self.next_step.emit({'name': name, 'surname': surname})
+        if contains_profanity(name) or contains_profanity(surname):
+            self.error_label.setText("Используйте нормальное имя без ругательств")
+            return
+        self.error_label.clear()
+        self.next_step.emit({"name": name, "surname": surname})
 
 
-# ==================== ЭТАП 4: USERNAME ====================
 class UsernameStep(QWidget):
     next_step = pyqtSignal(str)
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.username_timer = QTimer()
         self.username_timer.setSingleShot(True)
         self.username_timer.timeout.connect(self.check_username)
+        self.is_username_available = False
         self.init_ui()
-    
+
     def init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(80, 100, 80, 80)
-        main_layout.setSpacing(24)
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        
-        title = QLabel("Придумайте username")
-        title.setStyleSheet("color: #FFFFFF; font-size: 18px; font-weight: 500;")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(72, 90, 72, 72)
+        layout.setSpacing(18)
+
+        title = QLabel("Выберите username")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(title)
-        
-        subtitle = QLabel("Люди смогут найти вас по #username")
-        subtitle.setStyleSheet("color: #6B7280; font-size: 13px;")
+        title.setStyleSheet("color: white; font-size: 24px; font-weight: 700;")
+        layout.addWidget(title)
+
+        subtitle = QLabel("Он должен быть уникальным")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(subtitle)
-        
-        main_layout.addSpacing(30)
-        
-        username_widget = QWidget()
-        username_widget.setStyleSheet("background-color: #1A1B1E; border-radius: 10px;")
-        username_layout = QHBoxLayout(username_widget)
-        username_layout.setContentsMargins(16, 0, 16, 0)
-        username_layout.setSpacing(10)
-        
-        hash_icon = QLabel("#")
-        hash_icon.setStyleSheet("color: #6B7280; font-size: 18px; font-weight: 600; background-color: transparent;")
-        username_layout.addWidget(hash_icon)
-        
+        subtitle.setStyleSheet("color: #9CA3AF; font-size: 13px;")
+        layout.addWidget(subtitle)
+
         self.username_input = QLineEdit()
-        self.username_input.setPlaceholderText("Введите username")
-        self.username_input.setMaxLength(20)
-        self.username_input.setStyleSheet("""
-            background-color: transparent;
-            color: #FFFFFF;
-            border: none;
-            padding: 14px 8px;
-            font-size: 16px;
-        """)
+        self.username_input.setPlaceholderText("например levas")
+        self.username_input.setStyleSheet(input_style())
         self.username_input.textChanged.connect(self.on_username_changed)
-        username_layout.addWidget(self.username_input)
-        
-        main_layout.addWidget(username_widget)
-        
+        layout.addWidget(self.username_input)
+
         self.status_label = QLabel()
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.status_label, alignment=Qt.AlignmentFlag.AlignCenter)
-        
+        layout.addWidget(self.status_label)
+
         self.error_label = QLabel()
-        self.error_label.setStyleSheet("color: #EF4444; font-size: 12px;")
         self.error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.error_label)
-        
-        main_layout.addSpacing(10)
-        
+        self.error_label.setStyleSheet("color: #EF4444; font-size: 12px;")
+        layout.addWidget(self.error_label)
+
         self.continue_btn = QPushButton("Продолжить")
         self.continue_btn.setEnabled(False)
-        self.continue_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1F2937;
-                color: #6B7280;
-                border: none;
-                border-radius: 10px;
-                padding: 14px 28px;
-                font-size: 15px;
-                font-weight: 500;
-            }
-            QPushButton:hover:!disabled {
-                background-color: #374151;
-            }
-            QPushButton:disabled {
-                background-color: #1F2937;
-                color: #6B7280;
-            }
-            QPushButton:!disabled {
-                background-color: #10B981;
-                color: #FFFFFF;
-            }
-            QPushButton:!disabled:hover {
-                background-color: #059669;
-            }
-            QPushButton:!disabled:pressed {
-                background-color: #047857;
-            }
-        """)
-        self.continue_btn.setMinimumHeight(48)
-        self.continue_btn.clicked.connect(self.on_continue)
-        main_layout.addWidget(self.continue_btn)
-        
-        main_layout.addStretch()
-    
-    def on_username_changed(self, text):
+        self.continue_btn.setStyleSheet(primary_button_style())
+        self.continue_btn.clicked.connect(self.submit)
+        layout.addWidget(self.continue_btn)
+        layout.addStretch()
+
+    def on_username_changed(self, text: str):
         self.username_timer.stop()
-        self.status_label.setText("")
+        self.is_username_available = False
         self.continue_btn.setEnabled(False)
-        
-        username = text.strip()
-        
-        if len(username) >= 3 and len(username) <= 20:
-            import re
-            if re.match(r'^[a-zA-Z0-9_]+$', username):
-                self.username_timer.start(2000)
-    
-    def check_username(self):
-        username = self.username_input.text().strip()
-        
-        self.status_label.setText("⏳ Проверка...")
-        self.status_label.setStyleSheet("color: #6B7280; font-size: 12px;")
-        self.continue_btn.setEnabled(False)
-        
-        QTimer.singleShot(2000, lambda: self.on_check_complete())
-    
-    def on_check_complete(self):
-        self.status_label.setText("✓ Доступен")
-        self.status_label.setStyleSheet("color: #10B981; font-size: 12px;")
-        self.continue_btn.setEnabled(True)
-    
-    def on_continue(self):
-        username = self.username_input.text().strip()
-        if not username:
-            self.error_label.setText("Введите username")
+        self.status_label.clear()
+        self.error_label.clear()
+        if not text.strip():
             return
-        self.next_step.emit(username)
+        valid, result = auth_manager.validate_username(text)
+        if not valid:
+            self.error_label.setText(result)
+            return
+        if contains_profanity(text):
+            self.error_label.setText("Username содержит недопустимые слова")
+            return
+        self.status_label.setText("Проверяем username...")
+        self.status_label.setStyleSheet("color: #9CA3AF; font-size: 12px;")
+        self.username_timer.start(350)
+
+    def check_username(self):
+        available, result = auth_manager.check_username_available(self.username_input.text().strip())
+        if available:
+            self.is_username_available = True
+            self.status_label.setText(f"@{result} доступен")
+            self.status_label.setStyleSheet("color: #10B981; font-size: 12px;")
+            self.continue_btn.setEnabled(True)
+        else:
+            self.error_label.setText(result)
+            self.status_label.clear()
+
+    def submit(self):
+        if not self.is_username_available:
+            self.error_label.setText("Сначала дождитесь успешной проверки")
+            return
+        self.next_step.emit(auth_manager.normalize_username(self.username_input.text().strip()))
 
 
-# ==================== ЭТАП 5: ЗАГРУЗКА (7 СЕКУНД) ====================
 class LoadingStep(QWidget):
     finished = pyqtSignal()
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.init_ui()
-    
-    def init_ui(self):
-        self.setStyleSheet("background-color: #0F0F12;")
-        
-        main_layout = QVBoxLayout(self)
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.setSpacing(24)
-        
-        self.spinner = QLabel("⏳")
-        self.spinner.setStyleSheet("font-size: 56px; color: #FFFFFF;")
-        self.spinner.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.spinner)
-        
-        self.label = QLabel("Подготавливаем...")
-        self.label.setStyleSheet("color: #FFFFFF; font-size: 15px;")
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.label)
-        
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label = QLabel("Создаём аккаунт")
+        label.setStyleSheet("color: white; font-size: 22px; font-weight: 700;")
+        layout.addWidget(label)
         self.progress = QProgressBar()
-        self.progress.setRange(0, 100)
-        self.progress.setValue(0)
         self.progress.setTextVisible(False)
-        self.progress.setFixedSize(280, 4)
-        self.progress.setStyleSheet("""
-            QProgressBar {
-                background-color: #25262B;
-                border-radius: 2px;
-            }
-            QProgressBar::chunk {
-                background-color: #10B981;
-                border-radius: 2px;
-            }
-        """)
-        main_layout.addWidget(self.progress, alignment=Qt.AlignmentFlag.AlignCenter)
-        
+        self.progress.setFixedWidth(280)
+        self.progress.setStyleSheet(
+            """
+            QProgressBar { background-color: #1D1D24; border: none; border-radius: 4px; }
+            QProgressBar::chunk { background-color: #10B981; border-radius: 4px; }
+            """
+        )
+        layout.addWidget(self.progress)
         self.timer = QTimer()
-        self.timer.timeout.connect(self.update_progress)
-        self.elapsed = 0
-        self.duration = 7000
-        self.step = 100
-    
+        self.timer.timeout.connect(self.tick)
+        self.value = 0
+
     def start_loading(self):
-        self.elapsed = 0
+        self.value = 0
         self.progress.setValue(0)
-        self.timer.start(self.step)
-    
-    def update_progress(self):
-        self.elapsed += self.step
-        progress = min(100, int((self.elapsed / self.duration) * 100))
-        self.progress.setValue(progress)
-        
-        if self.elapsed >= self.duration:
+        self.timer.start(40)
+
+    def tick(self):
+        self.value += 2
+        self.progress.setValue(self.value)
+        if self.value >= 100:
             self.timer.stop()
             self.finished.emit()
 
 
-# ==================== ГЛАВНЫЙ МАСТЕР ====================
 class RegistrationWizard(QWidget):
     registration_complete = pyqtSignal(dict)
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Ten Dem")
         self.setMinimumSize(500, 700)
         self.resize(500, 700)
-        self.setStyleSheet("background-color: #0F0F12;")
-        
+        self.setStyleSheet("background-color: #0E0E12;")
         self.phone = ""
-        self.verification_id = None
         self.user_data = {}
         self.is_login_mode = False
         self.legal_step = None
-        
         self.init_ui()
-    
+
     def init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.stack = QStackedWidget()
-        self.stack.setStyleSheet("background-color: transparent;")
-        
-        # ✅ СОЗДАЁМ ВСЕ ЭТАПЫ
-        self.phone_step = PhoneStep()           # Индекс 0
-        self.login_step = LoginStep()           # Индекс 1
-        self.code_step = CodeStep()             # Индекс 2
-        self.name_step = NameStep()             # Индекс 3
-        self.username_step = UsernameStep()     # Индекс 4
-        self.legal_step = None                  # Индекс 5 (создадим позже)
-        self.loading_step = LoadingStep()       # Индекс 5 (пока что)
-        
-        # ✅ ДОБАВЛЯЕМ В СТЕК
-        self.stack.addWidget(self.phone_step)        # 0
-        self.stack.addWidget(self.login_step)        # 1
-        self.stack.addWidget(self.code_step)         # 2
-        self.stack.addWidget(self.name_step)         # 3
-        self.stack.addWidget(self.username_step)     # 4
-        self.stack.addWidget(self.loading_step)      # 5 (пока загрузка)
-        
-        main_layout.addWidget(self.stack)
-        
-        # ✅ ПОДКЛЮЧАЕМ СИГНАЛЫ
+        layout.addWidget(self.stack)
+
+        self.phone_step = PhoneStep()
+        self.code_step = CodeStep()
+        self.name_step = NameStep()
+        self.username_step = UsernameStep()
+        self.loading_step = LoadingStep()
+
+        self.stack.addWidget(self.phone_step)
+        self.stack.addWidget(self.code_step)
+        self.stack.addWidget(self.name_step)
+        self.stack.addWidget(self.username_step)
+        self.stack.addWidget(self.loading_step)
+
         self.phone_step.next_step.connect(self.on_phone_submitted)
-        self.phone_step.go_to_login.connect(self.go_to_login)
-        
-        self.login_step.next_step.connect(self.on_login_phone_submitted)
-        self.login_step.go_to_registration.connect(self.go_to_registration)
-        
-        self.code_step.next_step.connect(self.on_code_verified)
-        self.code_step.back_step.connect(self.go_back_from_code)
-        
+        self.code_step.verified.connect(self.on_code_verified)
+        self.code_step.back_step.connect(lambda: self.stack.setCurrentWidget(self.phone_step))
         self.name_step.next_step.connect(self.on_name_submitted)
         self.username_step.next_step.connect(self.on_username_submitted)
         self.loading_step.finished.connect(self.on_loading_finished)
-        
-        main_layout.addStretch()
-    
-    def on_phone_submitted(self, phone):
+
+    def on_phone_submitted(self, phone: str, is_login: bool):
         if phone == "skip":
-            self.registration_complete.emit({
-                'uid': 'test_user',
-                'phone': '+79990000000',
-                'name': 'Тестовый',
-                'username': 'test'
-            })
+            self.registration_complete.emit(
+                {"uid": "test_user", "phone": "+79990000000", "name": "Тестовый", "username": "test_user"}
+            )
             return
-        
         self.phone = phone
-        self.is_login_mode = False
-        self.code_step.set_login_mode(False)
-        
+        self.is_login_mode = is_login
         success, message, verification_id = auth_manager.send_verification_code(phone)
-        
-        if success:
-            self.verification_id = verification_id
-            self.code_step.set_phone(phone)
-            self.code_step.set_verification_id(verification_id)
-            self.code_step.start_timer()
-            self.stack.setCurrentIndex(2)
-        else:
+        if not success:
             self.phone_step.error_label.setText(message)
-    
-    def on_login_phone_submitted(self, phone):
-        self.phone = phone
-        self.is_login_mode = True
-        self.code_step.set_login_mode(True)
-        
-        success, message, verification_id = auth_manager.send_verification_code(phone)
-        
-        if success:
-            self.verification_id = verification_id
-            self.code_step.set_phone(phone)
-            self.code_step.set_verification_id(verification_id)
-            self.code_step.start_timer()
-            self.stack.setCurrentIndex(2)
-        else:
-            self.login_step.error_label.setText(message)
-    
-    def on_code_verified(self, result):
-        parts = result.split(":")
-        mode = parts[0]
-        phone = parts[1] if len(parts) > 1 else self.phone
-        
-        if mode == "login":
-            from src.database.users_db import get_user_by_phone
-            user_data = get_user_by_phone(phone)
-            if user_data:
-                self.registration_complete.emit({
-                    'uid': user_data['uid'],
-                    'phone': user_data['phone'],
-                    'name': user_data['name'],
-                    'username': user_data.get('username', '')
-                })
+            return
+        self.code_step.setup(phone, verification_id)
+        self.stack.setCurrentWidget(self.code_step)
+
+    def on_code_verified(self):
+        if self.is_login_mode:
+            user_data = get_user_by_phone(self.phone)
+            if not user_data:
+                self.code_step.error_label.setText("Аккаунт с этим номером не найден")
                 return
-            else:
-                self.code_step.error_label.setText("Аккаунт не найден")
-                return
-        else:
-            self.stack.setCurrentIndex(3)
-    
-    def on_name_submitted(self, data):
+            self.registration_complete.emit(
+                {
+                    "uid": user_data["uid"],
+                    "phone": user_data.get("phone", ""),
+                    "name": user_data.get("name", ""),
+                    "username": user_data.get("username", ""),
+                }
+            )
+            return
+        self.stack.setCurrentWidget(self.name_step)
+
+    def on_name_submitted(self, data: dict):
         self.user_data.update(data)
-        self.stack.setCurrentIndex(4)
-    
-    def on_username_submitted(self, username):
-        """✅ ОБРАБОТКА USERNAME — ДОБАВЛЯЕМ ЮРИДИЧЕСКИЕ СОГЛАШЕНИЯ"""
-        print(f"📝 Username введён: {username}")
-        self.user_data['username'] = username
-        
-        # ✅ СОЗДАЁМ ОКНО ЮРИДИЧЕСКИХ СОГЛАШЕНИЙ
-        print("📋 Создаём LegalAgreementWindow...")
+        self.stack.setCurrentWidget(self.username_step)
+
+    def on_username_submitted(self, username: str):
+        self.user_data["username"] = username
         self.legal_step = LegalAgreementWindow(self.user_data)
         self.legal_step.completed.connect(self.on_legal_completed)
-        
-        # ✅ ДОБАВЛЯЕМ В СТЕК ПОСЛЕ username_step
-        print("📋 Добавляем legal_step в стек (индекс 5)...")
-        self.stack.insertWidget(5, self.legal_step)
-        
-        # ✅ ПЕРЕКЛЮЧАЕМСЯ НА ЮРИДИЧЕСКИЕ СОГЛАШЕНИЯ
-        print("📋 Переключаемся на индекс 5...")
-        self.stack.setCurrentIndex(5)
-    
+        if self.stack.indexOf(self.legal_step) == -1:
+            self.stack.addWidget(self.legal_step)
+        self.stack.setCurrentWidget(self.legal_step)
+
     def on_legal_completed(self):
-        """✅ ПЕРЕХОД К ЗАГРУЗКЕ ПОСЛЕ СОГЛАШЕНИЙ"""
-        print("✅ Юридические соглашения приняты, переход к загрузке...")
-        
-        # Проверяем есть ли loading_step в стеке
-        if self.stack.count() <= 6:
-            self.stack.addWidget(self.loading_step)
-        
-        self.stack.setCurrentIndex(6)
+        self.stack.setCurrentWidget(self.loading_step)
         self.loading_step.start_loading()
-    
+
     def on_loading_finished(self):
-        print("✅ Загрузка завершена, завершаем регистрацию...")
-        self.registration_complete.emit({
-            'uid': '',
-            'phone': self.phone,
-            'name': self.user_data.get('name', ''),
-            'surname': self.user_data.get('surname', ''),
-            'username': self.user_data.get('username', '')
-        })
-    
-    def go_to_login(self):
-        self.stack.setCurrentIndex(1)
-    
-    def go_to_registration(self):
-        self.stack.setCurrentIndex(0)
-    
-    def go_back_from_code(self):
-        if self.is_login_mode:
-            self.stack.setCurrentIndex(1)
-        else:
-            self.stack.setCurrentIndex(0)
+        success, user_id, message = auth_manager.create_user_profile(
+            phone=self.phone,
+            name=self.user_data.get("name", ""),
+            surname=self.user_data.get("surname", ""),
+            username=self.user_data.get("username", ""),
+        )
+        if not success:
+            self.stack.setCurrentWidget(self.username_step)
+            self.username_step.error_label.setText(message)
+            return
+        self.registration_complete.emit(
+            {
+                "uid": user_id,
+                "phone": self.phone,
+                "name": self.user_data.get("name", ""),
+                "surname": self.user_data.get("surname", ""),
+                "username": self.user_data.get("username", ""),
+            }
+        )

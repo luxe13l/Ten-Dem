@@ -3,6 +3,7 @@
 """
 import sys
 import os
+import uuid
 from dotenv import load_dotenv
 
 # Загружаем переменные из .env
@@ -13,6 +14,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from PyQt6.QtWidgets import QApplication
 from src.database.firebase_client import init_firebase
 from src.database.yandex_storage import init_yandex_storage
+from src.database.local_store import load_store
+from src.database.users_db import update_user
+from src.styles.themes import apply_theme
 from src.ui.registration_wizard import RegistrationWizard
 from src.ui.main_window import MainWindow
 
@@ -38,14 +42,7 @@ def main():
         app = QApplication(sys.argv)
         app.setApplicationName("Ten Dem")
         app.setStyle("Fusion")
-        
-        app.setStyleSheet("""
-            QMainWindow, QDialog, QWidget {
-                background-color: #0F0F12;
-                color: #FFFFFF;
-                font-family: 'Segoe UI', Arial, sans-serif;
-            }
-        """)
+        apply_theme(app, "dark")
         
         print("4. Создание окна регистрации...")
         wizard = RegistrationWizard()
@@ -76,10 +73,33 @@ def on_registration_complete(data, wizard, app):
     
     from src.models.user import User
     current_user = User(
-        uid=data.get('uid', ''),
+        uid=data.get('uid', '') or f"local-{uuid.uuid4().hex[:8]}",
         phone=data.get('phone', ''),
-        name=data.get('name', '')
+        name=data.get('name', '') or 'Пользователь',
+        username=data.get('username', ''),
+        surname=data.get('surname', ''),
+        bio=data.get('bio', ''),
     )
+
+    user_settings = load_store().get("settings", {}).get(current_user.uid, {})
+    current_user.theme = user_settings.get("theme", "dark")
+    current_user.username = user_settings.get("username", current_user.username)
+    current_user.bio = user_settings.get("bio", current_user.bio)
+    apply_theme(app, current_user.theme)
+
+    if current_user.uid:
+        update_user(
+            current_user.uid,
+            {
+                'uid': current_user.uid,
+                'phone': current_user.phone,
+                'name': current_user.name,
+                'username': current_user.username,
+                'bio': current_user.bio,
+                'theme': current_user.theme,
+                'status': 'online',
+            }
+        )
     
     print("7. Создание главного окна мессенджера...")
     main_window_ref = MainWindow(current_user)

@@ -1,0 +1,166 @@
+{
+  "users": {},
+  "messages": [
+    {
+      "id": "5b27e005-7a48-4069-b4dd-f4e98301309c",
+      "from_uid": "user-6aa2a8a49695",
+      "to_uid": "6b2013e2",
+      "text": "Сообщение удалено",
+      "message_type": "photo",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T01:44:53.664960"
+      },
+      "status": "sent",
+      "file_url": "C:/Users/levas/Downloads/Telegram Desktop/image_2026-03-20_00-35-11.png",
+      "file_name": "image_2026-03-20_00-35-11.png",
+      "file_size": 257362,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": true,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "3001c0a5-4e1a-4941-b7de-cc6606d7c52b",
+      "from_uid": "user-6aa2a8a49695",
+      "to_uid": "6b2013e2",
+      "text": "hhjh",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T01:45:24.100231"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "5b27e005-7a48-4069-b4dd-f4e98301309c",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": false,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "04e4c3c5-4223-4ef9-9f85-044679e65583",
+      "from_uid": "user-6aa2a8a49695",
+      "to_uid": "6b2013e2",
+      "text": "l;l;ll",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T01:45:26.150153"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": false,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "42231d8d-1641-4abe-b24f-2290e1f9908b",
+      "from_uid": "user-6aa2a8a49695",
+      "to_uid": "6b2013e2",
+      "text": "l;ll",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T01:45:27.834222"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": false,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "c5ba6ce5-c567-4237-8086-9917a107b0e8",
+      "from_uid": "user-6aa2a8a49695",
+      "to_uid": "KQX3OgjIhpbb3f01B6eB",
+      "text": "Сообщение удалено",
+      "message_type": "video",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T01:45:49.075723"
+      },
+      "status": "sent",
+      "file_url": "C:/Users/levas/Videos/Camo Studio Recording 2025-10-07 14-51-06.mp4",
+      "file_name": "Camo Studio Recording 2025-10-07 14-51-06.mp4",
+      "file_size": 704439,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": true,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    }
+  ],
+  "settings": {
+    "test_user": {
+      "name": "Тестовый",
+      "username": "",
+      "bio": "",
+      "theme": "Светлая",
+      "font_scale": 20,
+      "sound": false,
+      "push": false,
+      "preview": false,
+      "dnd": true
+    },
+    "user-1100b998a2cb": {
+      "name": "Лев",
+      "username": "",
+      "bio": "",
+      "theme": "light",
+      "font_scale": 15,
+      "sound": true,
+      "push": true,
+      "preview": true,
+      "dnd": false
+    },
+    "user-8ffba48a913f": {
+      "name": "лев",
+      "username": "",
+      "bio": "",
+      "theme": "system",
+      "font_scale": 12,
+      "sound": true,
+      "push": true,
+      "preview": true,
+      "dnd": false
+    }
+  },
+  "pinned_messages": {}
+}
