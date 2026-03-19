@@ -1,4 +1,5 @@
 """Authentication and registration helpers."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -13,7 +14,7 @@ from src.database.users_db import get_all_users, update_user
 class AuthManager:
     def __init__(self):
         self.current_user = None
-        self._temp_codes = {}
+        self._temp_codes: dict[str, dict] = {}
 
     def send_verification_code(self, phone):
         try:
@@ -46,40 +47,45 @@ class AuthManager:
 
     @staticmethod
     def normalize_username(username: str) -> str:
-        cleaned = (username or "").strip().lower().lstrip("@")
-        return cleaned
+        return (username or "").strip().lower().lstrip("@")
 
     def validate_username(self, username: str):
         normalized = self.normalize_username(username)
         if len(normalized) < 3 or len(normalized) > 20:
             return False, "Username должен быть от 3 до 20 символов"
-        if not re.fullmatch(r"[a-z0-9_]+", normalized):
-            return False, "Только латиница, цифры и подчёркивание"
+        if any(char.isdigit() for char in normalized):
+            return False, "Цифры в username использовать нельзя"
+        if not re.fullmatch(r"[a-z_]+", normalized):
+            return False, "Только латинские буквы и подчёркивание"
         if normalized.startswith("_") or normalized.endswith("_"):
             return False, "Username не должен начинаться или заканчиваться _"
         return True, normalized
 
     def check_username_available(self, username, exclude_uid: str = ""):
-        valid, result = self.validate_username(username)
-        if not valid:
-            return False, result
+        try:
+            valid, result = self.validate_username(username)
+            if not valid:
+                return False, result
 
-        normalized = result
-        db = get_db()
-        if db:
-            try:
-                docs = db.collection("users").where("username", "==", normalized).limit(2).stream()
-                for doc in docs:
-                    if exclude_uid and doc.id == exclude_uid:
-                        continue
+            normalized = result
+            db = get_db()
+            if db:
+                try:
+                    docs = db.collection("users").where("username", "==", normalized).limit(2).stream()
+                    for doc in docs:
+                        if exclude_uid and doc.id == exclude_uid:
+                            continue
+                        return False, "Этот username уже занят"
+                except Exception as exc:
+                    print(f"Ошибка проверки username в Firebase: {exc}")
+
+            for user in get_all_users():
+                if self.normalize_username(user.get("username", "")) == normalized and user.get("uid") != exclude_uid:
                     return False, "Этот username уже занят"
-            except Exception as exc:
-                print(f"Ошибка проверки username в Firebase: {exc}")
-
-        for user in get_all_users():
-            if user.get("username", "").lower() == normalized and user.get("uid") != exclude_uid:
-                return False, "Этот username уже занят"
-        return True, normalized
+            return True, normalized
+        except Exception as exc:
+            print(f"Критическая ошибка проверки username: {exc}")
+            return False, "Не удалось проверить username"
 
     def create_user_profile(self, phone, name, surname, username):
         available, result = self.check_username_available(username)

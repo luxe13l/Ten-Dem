@@ -1,4 +1,5 @@
 """Registration wizard with real validation."""
+
 from __future__ import annotations
 
 import re
@@ -19,7 +20,7 @@ from src.database.users_db import get_user_by_phone
 from src.ui.legal_agreement import LegalAgreementWindow
 
 
-PROFANITY_PARTS = ("хуй", "хуе", "хуй", "еб", "пизд", "бля", "сук", "fuck", "shit")
+PROFANITY_PARTS = ("хуй", "хуе", "еб", "пизд", "бля", "сук", "fuck", "shit")
 
 
 def contains_profanity(value: str) -> bool:
@@ -336,7 +337,7 @@ class UsernameStep(QWidget):
         title.setStyleSheet("color: white; font-size: 24px; font-weight: 700;")
         layout.addWidget(title)
 
-        subtitle = QLabel("Он должен быть уникальным")
+        subtitle = QLabel("Только латинские буквы и подчёркивание, без цифр")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setStyleSheet("color: #9CA3AF; font-size: 13px;")
         layout.addWidget(subtitle)
@@ -383,15 +384,23 @@ class UsernameStep(QWidget):
         self.username_timer.start(350)
 
     def check_username(self):
-        available, result = auth_manager.check_username_available(self.username_input.text().strip())
-        if available:
-            self.is_username_available = True
-            self.status_label.setText(f"@{result} доступен")
-            self.status_label.setStyleSheet("color: #10B981; font-size: 12px;")
-            self.continue_btn.setEnabled(True)
-        else:
-            self.error_label.setText(result)
+        try:
+            available, result = auth_manager.check_username_available(self.username_input.text().strip())
+            if available:
+                self.is_username_available = True
+                self.status_label.setText(f"@{result} доступен")
+                self.status_label.setStyleSheet("color: #10B981; font-size: 12px;")
+                self.continue_btn.setEnabled(True)
+            else:
+                self.error_label.setText(result)
+                self.status_label.clear()
+                self.continue_btn.setEnabled(False)
+        except Exception as exc:
+            self.is_username_available = False
+            self.continue_btn.setEnabled(False)
             self.status_label.clear()
+            self.error_label.setText("Не удалось проверить username")
+            print(f"Ошибка шага username: {exc}")
 
     def submit(self):
         if not self.is_username_available:
@@ -480,7 +489,7 @@ class RegistrationWizard(QWidget):
     def on_phone_submitted(self, phone: str, is_login: bool):
         if phone == "skip":
             self.registration_complete.emit(
-                {"uid": "test_user", "phone": "+79990000000", "name": "Тестовый", "username": "test_user"}
+                {"uid": "test_user", "phone": "+79990000000", "name": "Тестовый", "username": "testuser"}
             )
             return
         self.phone = phone

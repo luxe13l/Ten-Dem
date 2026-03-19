@@ -1,4 +1,5 @@
 """User storage with Firestore support and local fallback."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -25,17 +26,18 @@ def get_user_by_phone(phone):
 
 
 def create_user(user_data):
+    uid = user_data.get("uid") or f"user-{int(datetime.now().timestamp())}"
+    payload = {**user_data, "uid": uid}
+
     db = get_db()
     if db is not None:
         try:
-            doc_ref = db.collection("users").add(user_data)
-            return doc_ref[1].id
+            db.collection("users").document(uid).set(payload)
         except Exception as exc:
             print(f"Ошибка создания пользователя в Firebase: {exc}")
 
-    uid = user_data.get("uid") or f"user-{int(datetime.now().timestamp())}"
     store = load_store()
-    store.setdefault("users", {})[uid] = {**user_data, "uid": uid}
+    store.setdefault("users", {})[uid] = payload
     save_store(store)
     return uid
 
@@ -45,7 +47,6 @@ def update_user(uid, data):
     if db is not None:
         try:
             db.collection("users").document(uid).set(data, merge=True)
-            return True
         except Exception as exc:
             print(f"Ошибка обновления пользователя в Firebase: {exc}")
 
@@ -67,7 +68,6 @@ def get_all_users():
             return [{"uid": doc.id, **(doc.to_dict() or {})} for doc in docs]
         except Exception as exc:
             print(f"Ошибка получения пользователей из Firebase: {exc}")
-
     return list(load_store().get("users", {}).values())
 
 

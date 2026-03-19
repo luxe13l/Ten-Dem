@@ -1,8 +1,10 @@
 """Settings dialog with real state saving."""
+
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -11,18 +13,26 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSlider,
     QVBoxLayout,
     QWidget,
-    QApplication,
 )
 
+from src.database.auth_manager import auth_manager
 from src.database.local_store import load_store, save_store
 from src.database.users_db import update_user
 from src.styles import FONT_FAMILY, RADIUS_BUTTON, RADIUS_CARD
 from src.styles.themes import apply_theme, get_theme_colors
+
+DEFAULT_SHORTCUTS = {
+    "send": "Ctrl+Return",
+    "search": "Ctrl+F",
+    "new_chat": "Ctrl+N",
+    "escape": "Esc",
+}
 
 
 class SettingsWindow(QDialog):
@@ -37,20 +47,23 @@ class SettingsWindow(QDialog):
         self.init_ui()
 
     def _load_settings(self):
-        return load_store().get("settings", {}).get(
-            self.current_user.uid,
-            {
-                "name": self.current_user.name,
-                "username": getattr(self.current_user, "username", ""),
-                "bio": getattr(self.current_user, "bio", ""),
-                "theme": getattr(self.current_user, "theme", "dark"),
-                "font_scale": 15,
-                "sound": True,
-                "push": True,
-                "preview": True,
-                "dnd": False,
-            },
-        )
+        defaults = {
+            "name": self.current_user.name,
+            "username": getattr(self.current_user, "username", ""),
+            "bio": getattr(self.current_user, "bio", ""),
+            "theme": getattr(self.current_user, "theme", "dark"),
+            "font_scale": 15,
+            "sound": True,
+            "push": True,
+            "preview": True,
+            "dnd": False,
+            "shortcuts": DEFAULT_SHORTCUTS.copy(),
+        }
+        data = load_store().get("settings", {}).get(self.current_user.uid, {})
+        merged = dict(defaults)
+        merged.update(data)
+        merged["shortcuts"] = {**DEFAULT_SHORTCUTS, **data.get("shortcuts", {})}
+        return merged
 
     def init_ui(self):
         self.setWindowTitle("Настройки")
@@ -80,7 +93,7 @@ class SettingsWindow(QDialog):
     def _create_header(self):
         frame = QFrame()
         frame.setStyleSheet(
-            f"QFrame {{ background-color: {self.colors['bg_tertiary']}; border-bottom: 1px solid {self.colors['divider']}; border-radius: 24px 24px 0 0; }}"
+            f"QFrame {{ background-color: {self.colors['bg_tertiary']}; border-radius: 24px 24px 0 0; }}"
         )
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(24, 20, 24, 20)
@@ -100,6 +113,7 @@ class SettingsWindow(QDialog):
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
         container = QWidget()
+        container.setStyleSheet("background: transparent;")
         layout = QVBoxLayout(container)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(18)
@@ -133,7 +147,10 @@ class SettingsWindow(QDialog):
         layout.addLayout(row)
 
         self.form_controls["name"] = self._line_edit(self.settings.get("name", self.current_user.name), "Имя")
-        self.form_controls["username"] = self._line_edit(self.settings.get("username", getattr(self.current_user, "username", "")), "@username")
+        self.form_controls["username"] = self._line_edit(
+            self.settings.get("username", getattr(self.current_user, "username", "")),
+            "@username",
+        )
         self.form_controls["bio"] = self._line_edit(self.settings.get("bio", getattr(self.current_user, "bio", "")), "О себе")
         layout.addWidget(self.form_controls["name"])
         layout.addWidget(self.form_controls["username"])
@@ -148,8 +165,8 @@ class SettingsWindow(QDialog):
         row.addWidget(label)
         row.addStretch()
         combo = QComboBox()
-        combo.addItems(["Темная", "Светлая", "Системная"])
-        combo.setCurrentText({"dark": "Темная", "light": "Светлая", "system": "Системная"}.get(self.settings.get("theme", "dark"), "Темная"))
+        combo.addItems(["Тёмная", "Светлая", "Системная"])
+        combo.setCurrentText({"dark": "Тёмная", "light": "Светлая", "system": "Системная"}.get(self.settings.get("theme", "dark"), "Тёмная"))
         combo.setStyleSheet(self._input_style())
         self.form_controls["theme"] = combo
         row.addWidget(combo)
@@ -168,7 +185,12 @@ class SettingsWindow(QDialog):
 
     def _notifications_section(self):
         section, layout = self._section("Уведомления")
-        for key, title in [("sound", "Звук сообщений"), ("push", "Push-уведомления"), ("preview", "Показывать текст"), ("dnd", "Не беспокоить")]:
+        for key, title in [
+            ("sound", "Звук сообщений"),
+            ("push", "Push-уведомления"),
+            ("preview", "Показывать текст"),
+            ("dnd", "Не беспокоить"),
+        ]:
             box = QCheckBox(title)
             box.setChecked(bool(self.settings.get(key, False)))
             box.setStyleSheet(
@@ -199,7 +221,7 @@ class SettingsWindow(QDialog):
     def _create_footer(self):
         frame = QFrame()
         frame.setStyleSheet(
-            f"QFrame {{ background-color: {self.colors['bg_tertiary']}; border-top: 1px solid {self.colors['divider']}; border-radius: 0 0 24px 24px; }}"
+            f"QFrame {{ background-color: {self.colors['bg_tertiary']}; border-radius: 0 0 24px 24px; }}"
         )
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(24, 18, 24, 18)
@@ -217,16 +239,25 @@ class SettingsWindow(QDialog):
         return frame
 
     def on_save(self):
+        raw_username = self.form_controls["username"].text().strip()
+        if raw_username:
+            available, result = auth_manager.check_username_available(raw_username, exclude_uid=self.current_user.uid)
+            if not available:
+                QMessageBox.warning(self, "Username", result)
+                return
+            raw_username = result
+
         payload = {
             "name": self.form_controls["name"].text().strip() or self.current_user.name,
-            "username": self.form_controls["username"].text().strip(),
+            "username": raw_username,
             "bio": self.form_controls["bio"].text().strip(),
-            "theme": {"Темная": "dark", "Светлая": "light", "Системная": "system"}.get(self.form_controls["theme"].currentText(), "dark"),
+            "theme": {"Тёмная": "dark", "Светлая": "light", "Системная": "system"}.get(self.form_controls["theme"].currentText(), "dark"),
             "font_scale": self.form_controls["font_scale"].value(),
             "sound": self.form_controls["sound"].isChecked(),
             "push": self.form_controls["push"].isChecked(),
             "preview": self.form_controls["preview"].isChecked(),
             "dnd": self.form_controls["dnd"].isChecked(),
+            "shortcuts": DEFAULT_SHORTCUTS.copy(),
         }
         store = load_store()
         store.setdefault("settings", {})[self.current_user.uid] = payload
@@ -235,7 +266,15 @@ class SettingsWindow(QDialog):
         self.current_user.username = payload["username"]
         self.current_user.bio = payload["bio"]
         self.current_user.theme = payload["theme"]
-        update_user(self.current_user.uid, {"name": payload["name"], "username": payload["username"], "bio": payload["bio"], "theme": payload["theme"]})
+        update_user(
+            self.current_user.uid,
+            {
+                "name": payload["name"],
+                "username": payload["username"],
+                "bio": payload["bio"],
+                "theme": payload["theme"],
+            },
+        )
         apply_theme(QApplication.instance(), payload["theme"])
         self.settings_saved.emit(payload)
         self.accept()
@@ -262,7 +301,7 @@ class SettingsWindow(QDialog):
         QLineEdit, QComboBox {{
             background-color: {self.colors['bg_primary']};
             color: {self.colors['text_primary']};
-            border: 1px solid {self.colors['divider']};
+            border: none;
             border-radius: {RADIUS_BUTTON}px;
             padding: 12px 14px;
             font-size: 14px;
@@ -274,7 +313,7 @@ class SettingsWindow(QDialog):
         return f"QPushButton {{ background-color: {self.colors['accent_primary']}; color: white; border: none; border-radius: {RADIUS_BUTTON}px; font-size: 14px; font-weight: 600; }}"
 
     def _secondary_button_style(self):
-        return f"QPushButton {{ background-color: transparent; color: {self.colors['text_secondary']}; border: 1px solid {self.colors['divider']}; border-radius: {RADIUS_BUTTON}px; font-size: 14px; font-weight: 500; }}"
+        return f"QPushButton {{ background-color: transparent; color: {self.colors['text_secondary']}; border: none; border-radius: {RADIUS_BUTTON}px; font-size: 14px; font-weight: 500; }}"
 
     def _icon_style(self):
         return f"""

@@ -42,25 +42,36 @@ class MessageBubble(QWidget):
         self.is_own = is_own
         self.current_user_uid = current_user_uid
         self.colors = get_theme_colors()
-        self._reaction_buttons: dict[str, QPushButton] = {}
         self._animation: QPropertyAnimation | None = None
         self.build_ui()
         self.refresh()
         self.play_appear_animation()
 
     def build_ui(self):
-        self.outer = QHBoxLayout(self)
-        self.outer.setContentsMargins(0, 0, 0, 0)
-        self.outer.setSpacing(0)
+        self.setStyleSheet("background: transparent;")
+        self.root = QVBoxLayout(self)
+        self.root.setContentsMargins(0, 0, 0, 0)
+        self.root.setSpacing(4)
+
+        self.row = QHBoxLayout()
+        self.row.setContentsMargins(0, 0, 0, 0)
+        self.row.setSpacing(8)
         if self.is_own:
-            self.outer.addStretch()
+            self.row.addStretch()
 
         self.card = QFrame()
         self.card.setMaximumWidth(560)
         self.card.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.outer.addWidget(self.card)
+        self.card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.row.addWidget(self.card)
         if not self.is_own:
-            self.outer.addStretch()
+            self.row.addStretch()
+
+        self.selection_badge = QLabel("✓")
+        self.selection_badge.setFixedSize(24, 24)
+        self.selection_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.row.addWidget(self.selection_badge, 0, Qt.AlignmentFlag.AlignBottom)
+        self.root.addLayout(self.row)
 
         self.content_layout = QVBoxLayout(self.card)
         self.content_layout.setContentsMargins(14, 10, 14, 10)
@@ -94,19 +105,17 @@ class MessageBubble(QWidget):
         self.meta_label.setAlignment(Qt.AlignmentFlag.AlignRight if self.is_own else Qt.AlignmentFlag.AlignLeft)
         self.content_layout.addWidget(self.meta_label)
 
-        self.reactions_row = QWidget()
-        self.reactions_layout = QHBoxLayout(self.reactions_row)
-        self.reactions_layout.setContentsMargins(0, 0, 0, 0)
-        self.reactions_layout.setSpacing(6)
-        self.reactions_row.hide()
-        self.content_layout.addWidget(self.reactions_row)
-
-        self.selection_badge = QLabel("✓")
-        self.selection_badge.setFixedSize(24, 24)
-        self.selection_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.selection_badge.setStyleSheet("display: none;")
-        self.outer.addSpacing(8)
-        self.outer.addWidget(self.selection_badge, 0, Qt.AlignmentFlag.AlignBottom)
+        self.reactions_wrap = QWidget()
+        self.reactions_wrap.setStyleSheet("background: transparent;")
+        self.reactions_row = QHBoxLayout(self.reactions_wrap)
+        self.reactions_row.setContentsMargins(0, 0, 0, 0)
+        self.reactions_row.setSpacing(6)
+        self.reactions_wrap.hide()
+        self.root.addWidget(
+            self.reactions_wrap,
+            0,
+            Qt.AlignmentFlag.AlignRight if self.is_own else Qt.AlignmentFlag.AlignLeft,
+        )
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -133,13 +142,18 @@ class MessageBubble(QWidget):
             }}
             """
         )
-        self.content_label.setStyleSheet(f"color: {text}; font-size: 15px; font-family: {FONT_FAMILY}; background: transparent;")
-        self.meta_label.setStyleSheet(f"color: {meta}; font-size: 11px; font-family: {FONT_FAMILY}; background: transparent;")
+        self.content_label.setStyleSheet(
+            f"color: {text}; font-size: 15px; font-family: {FONT_FAMILY}; background: transparent;"
+        )
+        self.meta_label.setStyleSheet(
+            f"color: {meta}; font-size: 11px; font-family: {FONT_FAMILY}; background: transparent;"
+        )
         self.forwarded_label.setStyleSheet(
             f"color: {meta}; font-size: 11px; font-family: {FONT_FAMILY}; background: transparent;"
         )
         self.poll_label.setStyleSheet(
-            f"color: {text}; font-size: 13px; font-family: {FONT_FAMILY}; background-color: rgba(255,255,255,0.06); border-radius: 12px; padding: 8px 10px;"
+            f"color: {text}; font-size: 13px; font-family: {FONT_FAMILY}; "
+            "background-color: rgba(255,255,255,0.06); border-radius: 12px; padding: 8px 10px;"
         )
         self.selection_badge.setStyleSheet(
             f"""
@@ -175,14 +189,14 @@ class MessageBubble(QWidget):
 
     def _refresh_photo_preview(self):
         should_show = self.message.message_type in {MessageType.PHOTO, MessageType.VIDEO}
-        self.photo_label.setVisible(should_show and not self.message.is_deleted)
-        if not should_show or self.message.is_deleted:
+        self.photo_label.setVisible(should_show)
+        if not should_show:
             return
         source = self.message.file_url
         if source and os.path.exists(source):
             pixmap = QPixmap(source)
             if not pixmap.isNull():
-                self.photo_label.setStyleSheet("border-radius: 16px;")
+                self.photo_label.setStyleSheet("background: transparent; border-radius: 16px;")
                 self.photo_label.setText("")
                 self.photo_label.setPixmap(
                     pixmap.scaled(
@@ -193,12 +207,13 @@ class MessageBubble(QWidget):
                 )
                 return
         self.photo_label.setText("Открыть медиа")
+        self.photo_label.setPixmap(QPixmap())
         self.photo_label.setStyleSheet(
             f"background-color: rgba(255,255,255,0.06); color: {self.colors['text_primary']}; border-radius: 16px;"
         )
 
     def _refresh_poll(self):
-        if self.message.message_type != MessageType.POLL or self.message.is_deleted:
+        if self.message.message_type != MessageType.POLL:
             self.poll_label.hide()
             return
         options = "\n".join(f"• {option}" for option in self.message.poll_options)
@@ -206,22 +221,19 @@ class MessageBubble(QWidget):
         self.poll_label.show()
 
     def _refresh_reactions(self):
-        while self.reactions_layout.count():
-            item = self.reactions_layout.takeAt(0)
+        while self.reactions_row.count():
+            item = self.reactions_row.takeAt(0)
             widget = item.widget()
             if widget:
                 widget.deleteLater()
-        self._reaction_buttons.clear()
 
         reactions = self.message.reactions or {}
-        if not reactions:
-            self.reactions_row.hide()
-            return
-
+        visible = False
         for emoji in QUICK_REACTIONS:
             users = reactions.get(emoji, [])
             if not users:
                 continue
+            visible = True
             button = QPushButton(f"{emoji} {len(users)}")
             button.setCursor(Qt.CursorShape.PointingHandCursor)
             active = self.current_user_uid in users
@@ -232,16 +244,15 @@ class MessageBubble(QWidget):
                     color: {self.colors['text_primary']};
                     border: none;
                     border-radius: 12px;
-                    padding: 4px 9px;
-                    font-size: 12px;
+                    padding: 2px 8px;
+                    font-size: 11px;
                 }}
                 """
             )
+            button.setFixedHeight(22)
             button.clicked.connect(lambda _, value=emoji: self.reaction_clicked.emit(self.message.id, value))
-            self.reactions_layout.addWidget(button)
-            self._reaction_buttons[emoji] = button
-        self.reactions_layout.addStretch()
-        self.reactions_row.setVisible(bool(self._reaction_buttons))
+            self.reactions_row.addWidget(button)
+        self.reactions_wrap.setVisible(visible)
 
     def play_appear_animation(self):
         effect = QGraphicsOpacityEffect(self)
@@ -251,11 +262,10 @@ class MessageBubble(QWidget):
         self._animation.setStartValue(0.0)
         self._animation.setEndValue(1.0)
         self._animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._animation.finished.connect(lambda: self.setGraphicsEffect(None))
         self._animation.start()
 
     def _content_text(self):
-        if self.message.is_deleted:
-            return "Сообщение удалено"
         if self.message.message_type == MessageType.PHOTO:
             return self.message.text or self.message.file_name or "Фото"
         if self.message.message_type == MessageType.FILE:
@@ -270,7 +280,7 @@ class MessageBubble(QWidget):
 
     def _meta_text(self):
         parts = [self.message.timestamp.strftime("%H:%M")]
-        if self.message.is_edited and not self.message.is_deleted:
+        if self.message.is_edited:
             parts.append("изменено")
         if self.is_own:
             parts.append("✓✓" if self.message.status in (MessageStatus.READ, MessageStatus.DELIVERED) else "✓")

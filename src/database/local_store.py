@@ -17,6 +17,10 @@ _DEFAULT_DATA: Dict[str, Any] = {
     "messages": [],
     "settings": {},
     "pinned_messages": {},
+    "pinned_chats": {},
+    "archived_chats": {},
+    "deleted_chats": {},
+    "muted_chats": {},
 }
 
 

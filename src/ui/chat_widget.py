@@ -5,12 +5,11 @@ from __future__ import annotations
 import os
 
 from PyQt6.QtCore import QEvent, QMimeData, QSize, QTimer, Qt, pyqtSignal
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QKeyEvent
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QKeyEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QFileDialog,
     QFrame,
     QHBoxLayout,
-    QInputDialog,
     QLabel,
     QMenu,
     QMessageBox,
@@ -37,17 +36,20 @@ from src.models.message import Message, MessageStatus, MessageType
 from src.styles import FONT_FAMILY
 from src.styles.themes import get_theme_colors
 from src.ui.attachment_preview_dialog import AttachmentPreviewDialog
+from src.ui.chat_action_dialogs import DeleteMessageDialog, EditMessageDialog, ForwardMessagesDialog
 from src.ui.message_bubble import MessageBubble
 from src.ui.photo_viewer_dialog import PhotoViewerDialog
+from src.ui.settings_window import DEFAULT_SHORTCUTS
 
 
 class ChatWidget(QWidget):
     chat_updated = pyqtSignal(str)
 
-    def __init__(self, current_user, contact, parent=None):
+    def __init__(self, current_user, contact, shortcuts_map: dict | None = None, parent=None):
         super().__init__(parent)
         self.current_user = current_user
         self.contact = contact
+        self.shortcuts_map = {**DEFAULT_SHORTCUTS, **(shortcuts_map or {})}
         self.colors = get_theme_colors(getattr(self.current_user, "theme", "dark"))
         self.messages: list[Message] = []
         self.message_widgets: dict[str, MessageBubble] = {}
@@ -55,9 +57,10 @@ class ChatWidget(QWidget):
         self.pinned_message_id = ""
         self.selection_mode = False
         self.selected_message_ids: set[str] = set()
-        self.pending_drop_files: list[str] = []
+        self._shortcuts: list[QShortcut] = []
         self.setAcceptDrops(True)
         self.build_ui()
+        self._bind_shortcuts()
         self.load_messages(animated=False)
 
     def build_ui(self):
@@ -75,7 +78,7 @@ class ChatWidget(QWidget):
         pinned_layout = QHBoxLayout(self.pinned_bar)
         pinned_layout.setContentsMargins(16, 8, 16, 8)
         self.pinned_label = QLabel()
-        self.pinned_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 13px;")
+        self.pinned_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 13px; background: transparent;")
         pinned_layout.addWidget(self.pinned_label, 1)
         pin_clear = QPushButton("Снять")
         pin_clear.setStyleSheet(self._ghost_button_style())
@@ -91,7 +94,7 @@ class ChatWidget(QWidget):
         reply_layout = QHBoxLayout(self.reply_bar)
         reply_layout.setContentsMargins(16, 8, 16, 8)
         self.reply_label = QLabel()
-        self.reply_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 13px;")
+        self.reply_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 13px; background: transparent;")
         reply_layout.addWidget(self.reply_label, 1)
         reply_clear = QPushButton("Отмена")
         reply_clear.setStyleSheet(self._ghost_button_style())
@@ -106,11 +109,13 @@ class ChatWidget(QWidget):
             f"""
             QScrollArea {{ border: none; background: {self.colors['bg_primary']}; }}
             QScrollBar:vertical {{ width: 8px; background: transparent; margin: 4px; }}
-            QScrollBar::handle:vertical {{ background: {self.colors['divider']}; border-radius: 4px; }}
+            QScrollBar::handle:vertical {{ background: rgba(255,255,255,0.0); border-radius: 4px; }}
+            QScrollBar::handle:vertical:hover {{ background: rgba(255,255,255,0.22); }}
             """
         )
 
         self.messages_container = QWidget()
+        self.messages_container.setStyleSheet("background: transparent;")
         self.messages_layout = QVBoxLayout(self.messages_container)
         self.messages_layout.setContentsMargins(18, 18, 18, 18)
         self.messages_layout.setSpacing(10)
@@ -118,13 +123,12 @@ class ChatWidget(QWidget):
         self.empty_state = QLabel("Здесь пока пусто. Напишите первое сообщение.")
         self.empty_state.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_state.setStyleSheet(
-            f"color: {self.colors['text_secondary']}; font-size: 14px; padding: 60px 0 20px 0;"
+            f"color: {self.colors['text_secondary']}; font-size: 14px; padding: 60px 0 20px 0; background: transparent;"
         )
         self.messages_layout.addWidget(self.empty_state)
         self.messages_layout.addStretch()
         self.messages_scroll.setWidget(self.messages_container)
         root.addWidget(self.messages_scroll, 1)
-
         root.addWidget(self._create_input_panel())
 
     def _create_header(self):
@@ -155,11 +159,11 @@ class ChatWidget(QWidget):
         title_layout = QVBoxLayout()
         title_layout.setSpacing(2)
         title = QLabel(self.contact.name or "Пользователь")
-        title.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 16px; font-weight: 600;")
+        title.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 16px; font-weight: 600; background: transparent;")
         title_layout.addWidget(title)
         status_text = "в сети" if self.contact.status == "online" else "был недавно"
         status = QLabel(status_text)
-        status.setStyleSheet(f"color: {self.colors['online']}; font-size: 12px;")
+        status.setStyleSheet(f"color: {self.colors['online']}; font-size: 12px; background: transparent;")
         title_layout.addWidget(status)
         layout.addLayout(title_layout)
         layout.addStretch()
@@ -185,9 +189,8 @@ class ChatWidget(QWidget):
         )
         layout = QHBoxLayout(self.selection_bar)
         layout.setContentsMargins(16, 10, 16, 10)
-
         self.selection_label = QLabel("Выбрано: 0")
-        self.selection_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 13px; font-weight: 600;")
+        self.selection_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 13px; font-weight: 600; background: transparent;")
         layout.addWidget(self.selection_label)
         layout.addStretch()
 
@@ -213,9 +216,11 @@ class ChatWidget(QWidget):
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(12)
 
+        assets_root = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets", "icons")
+
         self.attach_btn = QPushButton()
         self.attach_btn.setFixedSize(42, 42)
-        self.attach_btn.setIcon(QIcon(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets", "icons", "attach.svg")))
+        self.attach_btn.setIcon(QIcon(os.path.join(assets_root, "attach.svg")))
         self.attach_btn.setIconSize(QSize(18, 18))
         self.attach_btn.setStyleSheet(self._icon_button_style())
         self.attach_btn.clicked.connect(self.on_attach_clicked)
@@ -237,6 +242,28 @@ class ChatWidget(QWidget):
                 font-size: 15px;
                 font-family: {FONT_FAMILY};
             }}
+            QScrollBar:vertical {{
+                background: transparent;
+                width: 8px;
+                margin: 8px 4px 8px 0;
+            }}
+            QScrollBar::handle:vertical {{
+                background: rgba(255,255,255,0.0);
+                min-height: 28px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: rgba(255,255,255,0.22);
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+                width: 0px;
+                border: none;
+                background: transparent;
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: transparent;
+            }}
             """
         )
         self.input_field.setMinimumHeight(44)
@@ -245,7 +272,7 @@ class ChatWidget(QWidget):
         self.send_btn = QPushButton()
         self.send_btn.setEnabled(False)
         self.send_btn.setFixedSize(42, 42)
-        self.send_btn.setIcon(QIcon(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets", "icons", "send.svg")))
+        self.send_btn.setIcon(QIcon(os.path.join(assets_root, "send.svg")))
         self.send_btn.setIconSize(QSize(18, 18))
         self.send_btn.clicked.connect(self.on_send_clicked)
         self.send_btn.setStyleSheet(
@@ -266,6 +293,32 @@ class ChatWidget(QWidget):
         layout.addWidget(self.send_btn)
         return panel
 
+    def _bind_shortcuts(self):
+        for shortcut in self._shortcuts:
+            shortcut.deleteLater()
+        self._shortcuts = []
+        bindings = {
+            "send": self._send_shortcut_triggered,
+            "escape": self._escape_shortcut_triggered,
+        }
+        for key, handler in bindings.items():
+            sequence = self.shortcuts_map.get(key)
+            if not sequence:
+                continue
+            shortcut = QShortcut(QKeySequence(sequence), self)
+            shortcut.activated.connect(handler)
+            self._shortcuts.append(shortcut)
+
+    def _send_shortcut_triggered(self):
+        if self.input_field.hasFocus() and self.send_btn.isEnabled():
+            self.on_send_clicked()
+
+    def _escape_shortcut_triggered(self):
+        if self.selection_mode:
+            self.exit_selection_mode()
+        elif self.reply_bar.isVisible():
+            self.clear_reply()
+
     def load_messages(self, animated: bool = True):
         self._show_loading_state()
         QTimer.singleShot(80 if animated else 0, self._finish_loading_messages)
@@ -282,9 +335,7 @@ class ChatWidget(QWidget):
         for _ in range(3):
             skeleton = QFrame()
             skeleton.setFixedHeight(54)
-            skeleton.setStyleSheet(
-                f"QFrame {{ background-color: {self.colors['bg_tertiary']}; border-radius: 18px; }}"
-            )
+            skeleton.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_tertiary']}; border-radius: 18px; }}")
             self.messages_layout.addWidget(skeleton)
         self.messages_layout.addStretch()
 
@@ -301,16 +352,14 @@ class ChatWidget(QWidget):
                     widget.deleteLater()
 
         records = get_messages(self.current_user.uid, self.contact.uid, limit=200)
+        records = [record for record in records if self.current_user.uid not in record.get("deleted_for", [])]
         self.messages_layout.addWidget(self.empty_state)
         self.empty_state.setVisible(not records)
 
         for record in records:
-            if self.current_user.uid in record.get("deleted_for", []):
-                continue
             message = Message.from_dict(record, record.get("id"))
             self._add_message_widget(message)
         self.messages_layout.addStretch()
-
         mark_chat_as_read(self.current_user.uid, self.contact.uid)
         QTimer.singleShot(0, self.scroll_to_bottom)
 
@@ -324,9 +373,7 @@ class ChatWidget(QWidget):
             parent=self.messages_container,
         )
         bubble.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        bubble.customContextMenuRequested.connect(
-            lambda pos, msg_id=message.id, widget=bubble: self.show_message_menu(widget, pos, msg_id)
-        )
+        bubble.customContextMenuRequested.connect(lambda pos, msg_id=message.id, widget=bubble: self.show_message_menu(widget, pos, msg_id))
         bubble.clicked.connect(self.on_bubble_clicked)
         bubble.photo_requested.connect(self.open_photo_viewer)
         bubble.reaction_clicked.connect(self.apply_reaction)
@@ -354,15 +401,15 @@ class ChatWidget(QWidget):
         reply_action = menu.addAction("Ответить")
         pin_action = menu.addAction("Закрепить")
         react_menu = menu.addMenu("Реакции")
+        react_menu.setStyleSheet(self._menu_style())
         for emoji in QUICK_REACTIONS:
             action = react_menu.addAction(emoji)
             action.triggered.connect(lambda _, value=emoji, msg_id=message.id: self.apply_reaction(msg_id, value))
         menu.addSeparator()
         select_action = menu.addAction("Выбрать")
         forward_action = menu.addAction("Переслать")
-        edit_action = menu.addAction("Изменить") if message.from_uid == self.current_user.uid and not message.is_deleted else None
-        delete_me_action = menu.addAction("Удалить у меня")
-        delete_all_action = menu.addAction("Удалить у всех") if message.from_uid == self.current_user.uid else None
+        edit_action = menu.addAction("Изменить") if message.from_uid == self.current_user.uid else None
+        delete_action = menu.addAction("Удалить")
 
         action = menu.exec(bubble.mapToGlobal(pos))
         if action == reply_action:
@@ -380,25 +427,15 @@ class ChatWidget(QWidget):
             self.forward_selected_messages()
         elif edit_action and action == edit_action:
             self.edit_message(message)
-        elif action == delete_me_action:
-            self.delete_message(message, for_everyone=False)
-        elif delete_all_action and action == delete_all_action:
-            self.delete_message(message, for_everyone=True)
+        elif action == delete_action:
+            self.request_delete_message(message)
 
     def on_send_clicked(self):
         text = self.input_field.toPlainText().strip()
         if text:
             self._send(text=text, message_type=MessageType.TEXT)
 
-    def _send(
-        self,
-        text: str,
-        message_type: MessageType,
-        file_url: str = "",
-        file_name: str = "",
-        file_size: int = 0,
-        poll_options: list[str] | None = None,
-    ):
+    def _send(self, text: str, message_type: MessageType, file_url: str = "", file_name: str = "", file_size: int = 0, poll_options: list[str] | None = None):
         message_id = send_message_record(
             from_uid=self.current_user.uid,
             to_uid=self.contact.uid,
@@ -457,10 +494,10 @@ class ChatWidget(QWidget):
         self.pinned_label.clear()
 
     def edit_message(self, message: Message):
-        new_text, ok = QInputDialog.getText(self, "Изменить сообщение", "Новый текст:", text=message.text)
-        if not ok:
+        dialog = EditMessageDialog(message.text, self)
+        if dialog.exec() != dialog.DialogCode.Accepted:
             return
-        new_text = new_text.strip()
+        new_text = dialog.result_text.strip()
         if not new_text:
             return
         if not edit_message_record(message.id, new_text):
@@ -473,21 +510,20 @@ class ChatWidget(QWidget):
             bubble.update_message(message)
         self.chat_updated.emit(self.contact.uid)
 
+    def request_delete_message(self, message: Message):
+        dialog = DeleteMessageDialog(allow_for_everyone=message.from_uid == self.current_user.uid, parent=self)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        self.delete_message(message, for_everyone=dialog.result_mode == "all")
+
     def delete_message(self, message: Message, for_everyone: bool):
         if not delete_message_record(message.id, for_everyone=for_everyone, deleted_by=self.current_user.uid):
             QMessageBox.warning(self, "Ошибка", "Не удалось удалить сообщение.")
             return
-        if for_everyone:
-            message.is_deleted = True
-            message.text = "Сообщение удалено"
-            bubble = self.message_widgets.get(message.id)
-            if bubble:
-                bubble.update_message(message)
-        else:
-            bubble = self.message_widgets.pop(message.id, None)
-            if bubble:
-                bubble.deleteLater()
-            self.messages = [item for item in self.messages if item.id != message.id]
+        bubble = self.message_widgets.pop(message.id, None)
+        if bubble:
+            bubble.deleteLater()
+        self.messages = [item for item in self.messages if item.id != message.id]
         self.selected_message_ids.discard(message.id)
         self.empty_state.setVisible(not self.messages)
         self._refresh_selection_widgets()
@@ -541,12 +577,10 @@ class ChatWidget(QWidget):
         if not users:
             QMessageBox.information(self, "Пересылка", "Пока нет других чатов для пересылки.")
             return
-        labels = [f"{user.get('name', 'Пользователь')} (@{user.get('username', '')})".strip() for user in users]
-        picked, ok = QInputDialog.getItem(self, "Переслать", "Выберите чат:", labels, 0, False)
-        if not ok or not picked:
+        dialog = ForwardMessagesDialog(users, self)
+        if dialog.exec() != dialog.DialogCode.Accepted or not dialog.selected_uid:
             return
-        target = users[labels.index(picked)]
-        created = forward_messages(self.current_user.uid, list(self.selected_message_ids), target.get("uid"))
+        created = forward_messages(self.current_user.uid, list(self.selected_message_ids), dialog.selected_uid)
         if not created:
             QMessageBox.warning(self, "Пересылка", "Не удалось переслать сообщения.")
             return
@@ -589,17 +623,7 @@ class ChatWidget(QWidget):
             self.preview_and_send_files(files, MessageType.FILE)
 
     def attach_poll(self):
-        question, ok = QInputDialog.getText(self, "Опрос", "Вопрос:")
-        if not ok or not question.strip():
-            return
-        options, ok = QInputDialog.getText(self, "Опрос", "Варианты через запятую:")
-        if not ok or not options.strip():
-            return
-        poll_options = [item.strip() for item in options.split(",") if item.strip()]
-        if len(poll_options) < 2:
-            QMessageBox.information(self, "Опрос", "Нужно минимум два варианта.")
-            return
-        self._send(question.strip(), MessageType.POLL, poll_options=poll_options)
+        QMessageBox.information(self, "Опрос", "Нормальный экран опросов сделаю отдельным блоком, чтобы не оставлять сырые системные окна.")
 
     def preview_and_send_files(self, files: list[str], kind: MessageType):
         dialog = AttachmentPreviewDialog(files, parent=self)
@@ -620,22 +644,15 @@ class ChatWidget(QWidget):
                 file_name=os.path.basename(file_path),
                 file_size=os.path.getsize(file_path) if os.path.exists(file_path) else 0,
             )
-            QTimer.singleShot(10, lambda: None)
         progress.setValue(len(files))
 
     def open_photo_viewer(self, message_id: str):
-        media = [message.to_dict() for message in self.messages if message.message_type in {MessageType.PHOTO, MessageType.VIDEO} and not message.is_deleted]
+        media = [message.to_dict() for message in self.messages if message.message_type in {MessageType.PHOTO, MessageType.VIDEO}]
         if not media:
             return
         target_index = next((index for index, item in enumerate(media) if item.get("id") == message_id), 0)
         viewer = PhotoViewerDialog(media, target_index, self)
-        viewer.delete_requested.connect(self._delete_from_viewer)
         viewer.exec()
-
-    def _delete_from_viewer(self, message_id: str):
-        message = self._find_message(message_id)
-        if message:
-            self.delete_message(message, for_everyone=message.from_uid == self.current_user.uid)
 
     def _find_message(self, message_id: str) -> Message | None:
         for message in self.messages:
@@ -671,9 +688,7 @@ class ChatWidget(QWidget):
         files = self._extract_files(event.mimeData())
         if not files:
             return
-        self.pending_drop_files = files
         self.preview_and_send_files(files, self._guess_kind(files))
-        self.pending_drop_files = []
         event.acceptProposedAction()
 
     def _mime_has_files(self, mime: QMimeData) -> bool:
@@ -694,7 +709,7 @@ class ChatWidget(QWidget):
         QMenu {{
             background-color: {self.colors['bg_secondary']};
             color: {self.colors['text_primary']};
-            border: 1px solid {self.colors['divider']};
+            border: none;
             border-radius: 14px;
             padding: 8px;
         }}
@@ -702,7 +717,9 @@ class ChatWidget(QWidget):
             padding: 8px 14px;
             border-radius: 8px;
         }}
-        QMenu::item:selected {{ background-color: {self.colors['bg_tertiary']}; }}
+        QMenu::item:selected {{
+            background-color: {self.colors['bg_tertiary']};
+        }}
         """
 
     def _icon_button_style(self):

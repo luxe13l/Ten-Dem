@@ -5,77 +5,70 @@ from __future__ import annotations
 import os
 import shutil
 
-from PyQt6.QtCore import QPoint, Qt, pyqtSignal
+from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
+    QDialog,
     QFileDialog,
     QFrame,
+    QGraphicsPixmapItem,
+    QGraphicsScene,
+    QGraphicsView,
     QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
-    QWidget,
-    QDialog,
 )
 
 from src.styles.themes import get_theme_colors
 
 
-class ZoomableImageLabel(QLabel):
+class PhotoGraphicsView(QGraphicsView):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._pixmap = QPixmap()
+        self.setScene(QGraphicsScene(self))
+        self.pixmap_item = QGraphicsPixmapItem()
+        self.scene().addItem(self.pixmap_item)
+        self.setRenderHints(self.renderHints())
+        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setStyleSheet("background: transparent; border: none;")
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self._zoom = 1.0
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-    def set_source_pixmap(self, pixmap: QPixmap):
-        self._pixmap = pixmap
+    def set_pixmap(self, pixmap: QPixmap):
+        self.pixmap_item.setPixmap(pixmap)
+        self.scene().setSceneRect(self.pixmap_item.boundingRect())
+        self.resetTransform()
         self._zoom = 1.0
-        self._apply_scale()
+        self.fitInView(self.pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
 
     def wheelEvent(self, event):
-        if self._pixmap.isNull():
+        if self.pixmap_item.pixmap().isNull():
             return
-        delta = event.angleDelta().y()
-        self._zoom = max(0.25, min(4.0, self._zoom + (0.15 if delta > 0 else -0.15)))
-        self._apply_scale()
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._apply_scale()
-
-    def _apply_scale(self):
-        if self._pixmap.isNull() or self.width() <= 0 or self.height() <= 0:
+        factor = 1.16 if event.angleDelta().y() > 0 else 0.86
+        next_zoom = self._zoom * factor
+        if next_zoom < 0.2 or next_zoom > 8:
             return
-        base = self._pixmap.scaled(
-            self.size(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        scaled = self._pixmap.scaled(
-            max(1, int(base.width() * self._zoom)),
-            max(1, int(base.height() * self._zoom)),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        self.setPixmap(scaled)
+        self._zoom = next_zoom
+        self.scale(factor, factor)
 
 
 class PhotoViewerDialog(QDialog):
-    delete_requested = pyqtSignal(str)
-
     def __init__(self, items: list[dict], current_index: int = 0, parent=None):
         super().__init__(parent)
         self.items = items
         self.current_index = current_index
         self.colors = get_theme_colors()
-        self._drag_start = QPoint()
+        self._swipe_start = QPoint()
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         self.setWindowFlag(Qt.WindowType.Dialog, True)
         self.setModal(True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet("background-color: rgba(4, 9, 16, 0.93);")
+        self.setStyleSheet("background-color: rgba(5, 8, 14, 0.92);")
         self.build_ui()
         self.load_current()
 
@@ -108,10 +101,6 @@ class PhotoViewerDialog(QDialog):
         self.download_button = self._action_button("Скачать")
         self.download_button.clicked.connect(self.download_current)
         top.addWidget(self.download_button)
-
-        self.delete_button = self._action_button("Удалить")
-        self.delete_button.clicked.connect(self.delete_current)
-        top.addWidget(self.delete_button)
         frame_layout.addLayout(top)
 
         center = QHBoxLayout()
@@ -121,10 +110,9 @@ class PhotoViewerDialog(QDialog):
         self.prev_button.clicked.connect(self.show_previous)
         center.addWidget(self.prev_button, 0, Qt.AlignmentFlag.AlignVCenter)
 
-        self.image_label = ZoomableImageLabel()
-        self.image_label.setMinimumSize(520, 360)
-        self.image_label.setStyleSheet("background: transparent;")
-        center.addWidget(self.image_label, 1)
+        self.image_view = PhotoGraphicsView()
+        self.image_view.setMinimumSize(520, 360)
+        center.addWidget(self.image_view, 1)
 
         self.next_button = self._nav_button("›")
         self.next_button.clicked.connect(self.show_next)
@@ -186,11 +174,11 @@ class PhotoViewerDialog(QDialog):
 
         pixmap = QPixmap(file_path) if file_path and os.path.exists(file_path) else QPixmap()
         if pixmap.isNull():
-            self.image_label.setText("Не удалось загрузить фото")
-            self.image_label.setPixmap(QPixmap())
+            placeholder = QPixmap(900, 600)
+            placeholder.fill(Qt.GlobalColor.transparent)
+            self.image_view.set_pixmap(placeholder)
         else:
-            self.image_label.setText("")
-            self.image_label.set_source_pixmap(pixmap)
+            self.image_view.set_pixmap(pixmap)
 
         self.prev_button.setVisible(len(self.items) > 1)
         self.next_button.setVisible(len(self.items) > 1)
@@ -221,20 +209,15 @@ class PhotoViewerDialog(QDialog):
         except OSError as exc:
             QMessageBox.warning(self, "Ошибка", f"Не удалось сохранить файл: {exc}")
 
-    def delete_current(self):
-        item = self.items[self.current_index]
-        self.delete_requested.emit(item.get("id", ""))
-        self.accept()
-
     def mousePressEvent(self, event):
-        self._drag_start = event.position().toPoint()
-        if not self.content.geometry().contains(self._drag_start):
+        self._swipe_start = event.position().toPoint()
+        if not self.content.geometry().contains(self._swipe_start):
             self.reject()
             return
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
-        delta = event.position().toPoint() - self._drag_start
+        delta = event.position().toPoint() - self._swipe_start
         if abs(delta.x()) > 80 and abs(delta.x()) > abs(delta.y()):
             if delta.x() > 0:
                 self.show_previous()

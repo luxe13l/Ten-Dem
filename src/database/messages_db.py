@@ -43,8 +43,6 @@ def _participants_match(message: dict[str, Any], uid1: str, uid2: str) -> bool:
 
 
 def _preview_message(message: dict[str, Any]) -> str:
-    if message.get("is_deleted"):
-        return "Сообщение удалено"
     message_type = message.get("message_type", MessageType.TEXT.value)
     if message_type == MessageType.PHOTO.value:
         return "Фото"
@@ -76,6 +74,8 @@ def _sync_to_firestore(message_id: str, action: str, payload: dict[str, Any] | N
             clean = _sanitize_firestore_payload(payload)
             ref.set(clean)
             _update_last_message(clean["from_uid"], clean["to_uid"], clean)
+        elif action == "remove":
+            ref.delete()
         elif action in {"edit", "delete", "reaction"} and payload is not None:
             ref.set(_sanitize_firestore_payload(payload), merge=True)
     except Exception as exc:
@@ -117,7 +117,6 @@ def send_message(
         "forwarded_from_uid": forwarded_from_uid,
         "is_edited": False,
         "edited_at": None,
-        "is_deleted": False,
         "deleted_for": [],
         "disappears_at": _now() if disappears_in else None,
         "reactions": {},
@@ -159,32 +158,27 @@ def edit_message(message_id: str, new_text: str) -> bool:
             message["is_edited"] = True
             message["edited_at"] = _now()
             _save_local_messages(messages)
-            _spawn_sync(
-                message_id,
-                "edit",
-                {"text": new_text, "is_edited": True, "edited_at": message["edited_at"]},
-            )
+            _spawn_sync(message_id, "edit", {"text": new_text, "is_edited": True, "edited_at": message["edited_at"]})
             return True
     return False
 
 
 def delete_message(message_id: str, for_everyone: bool = False, deleted_by: str = "") -> bool:
     messages = _load_local_messages()
-    for message in messages:
+    for index, message in enumerate(messages):
         if message.get("id") != message_id:
             continue
         if for_everyone:
-            message["is_deleted"] = True
-            message["text"] = "Сообщение удалено"
-            payload = {"is_deleted": True, "text": "Сообщение удалено"}
+            messages.pop(index)
+            _save_local_messages(messages)
+            _spawn_sync(message_id, "remove", None)
         else:
             deleted_for = list(message.get("deleted_for", []))
             if deleted_by and deleted_by not in deleted_for:
                 deleted_for.append(deleted_by)
             message["deleted_for"] = deleted_for
-            payload = {"deleted_for": deleted_for}
-        _save_local_messages(messages)
-        _spawn_sync(message_id, "delete", payload)
+            _save_local_messages(messages)
+            _spawn_sync(message_id, "delete", {"deleted_for": deleted_for})
         return True
     return False
 
@@ -252,11 +246,13 @@ def get_messages(user_uid: str, contact_uid: str, limit: int = 50) -> list[dict[
                     data["id"] = data.get("id") or doc.id
                     data.setdefault("reactions", {})
                     data.setdefault("poll_options", [])
+                    data.setdefault("deleted_for", [])
                     remote.append(data)
             merged = {item["id"]: item for item in remote}
             for item in local_messages:
                 item.setdefault("reactions", {})
                 item.setdefault("poll_options", [])
+                item.setdefault("deleted_for", [])
                 merged[item["id"]] = item
             result = list(merged.values())
             result.sort(key=lambda item: item.get("timestamp") or _now())
@@ -271,6 +267,8 @@ def get_chat_summaries(current_uid: str) -> dict[str, dict[str, Any]]:
     summaries: dict[str, dict[str, Any]] = {}
     for message in _load_local_messages():
         if current_uid not in {message.get("from_uid"), message.get("to_uid")}:
+            continue
+        if current_uid in message.get("deleted_for", []):
             continue
         contact_uid = message.get("to_uid") if message.get("from_uid") == current_uid else message.get("from_uid")
         summary = summaries.setdefault(contact_uid, {"last_message": "", "timestamp": datetime.min, "unread_count": 0})
@@ -292,24 +290,6 @@ def get_message_by_id(message_id: str) -> dict[str, Any] | None:
         if message.get("id") == message_id:
             return message
     return None
-
-
-def forward_message(from_uid: str, to_uid: str, original_message_id: str, new_to_uid: str) -> str | None:
-    original = get_message_by_id(original_message_id)
-    if not original:
-        return None
-    return send_message(
-        from_uid=from_uid,
-        to_uid=new_to_uid,
-        text=original.get("text", ""),
-        message_type=_normalize_type(original.get("message_type", MessageType.TEXT.value)),
-        file_url=original.get("file_url", ""),
-        file_name=original.get("file_name", ""),
-        file_size=original.get("file_size", 0),
-        duration=original.get("duration", 0),
-        forwarded_from_uid=to_uid,
-        poll_options=original.get("poll_options", []),
-    )
 
 
 def forward_messages(from_uid: str, selected_ids: list[str], new_to_uid: str) -> list[str]:
@@ -334,11 +314,7 @@ def forward_messages(from_uid: str, selected_ids: list[str], new_to_uid: str) ->
 
 
 def get_media_gallery(user_uid: str, contact_uid: str, media_type: str = "photo") -> list[dict[str, Any]]:
-    return [
-        item
-        for item in get_messages(user_uid, contact_uid, limit=500)
-        if item.get("message_type") == media_type and not item.get("is_deleted")
-    ]
+    return [item for item in get_messages(user_uid, contact_uid, limit=500) if item.get("message_type") == media_type]
 
 
 def _update_last_message(uid1: str, uid2: str, message_data: dict[str, Any]):

@@ -1,70 +1,67 @@
-"""
-Цветовая палитра Ten Dem
-Отвечает: [Имя друга]
-"""
+"""Core color palette for Ten Dem."""
 
-# ============================================================================
-# ТЁМНАЯ ТЕМА (по умолчанию)
-# ============================================================================
+# Dark theme
+BG_PRIMARY = "#11161D"
+BG_SECONDARY = "#18212B"
+BG_TERTIARY = "#24313F"
 
-# Фоны
-BG_PRIMARY = '#0A0A0A'        # Основной фон приложения
-BG_SECONDARY = '#141414'      # Панели, карточки
-BG_TERTIARY = '#1E1E1E'       # Поля ввода, ховеры
+ACCENT_PRIMARY = "#4C9EEB"
+ACCENT_HOVER = "#63ABF1"
+ACCENT_PRESSED = "#3D8BDA"
 
-# Акценты (чистый сине-голубой)
-ACCENT_PRIMARY = '#2F80ED'    # Кнопки, свои сообщения
-ACCENT_HOVER = '#4393F4'      # Наведение
-ACCENT_PRESSED = '#256FD0'    # Нажатие
+TEXT_PRIMARY = "#F4F7FA"
+TEXT_SECONDARY = "#AAB7C6"
+TEXT_TERTIARY = "#7E8C9C"
+TEXT_ON_ACCENT = "#FFFFFF"
 
-# Текст
-TEXT_PRIMARY = '#FFFFFF'      # Основной текст
-TEXT_SECONDARY = '#A0A0A0'    # Второстепенный
-TEXT_TERTIARY = '#6B6B6B'     # Время, метки
-TEXT_ON_ACCENT = '#FFFFFF'    # Текст на акценте
+MESSAGE_OWN_BG = "#4C9EEB"
+MESSAGE_OWN_TEXT = "#FFFFFF"
+MESSAGE_OTHER_BG = "#22303D"
+MESSAGE_OTHER_TEXT = "#F4F7FA"
+MESSAGE_TIME = "#7E8C9C"
 
-# Сообщения
-MESSAGE_OWN_BG = '#2F80ED'    # Свои сообщения
-MESSAGE_OWN_TEXT = '#FFFFFF'
-MESSAGE_OTHER_BG = '#1E1E1E'  # Чужие сообщения
-MESSAGE_OTHER_TEXT = '#FFFFFF'
-MESSAGE_TIME = '#6B6B6B'
+ONLINE = "#35C98A"
+OFFLINE = "#627181"
+UNREAD_BADGE = "#EF5A5A"
+DELIVERED_CHECK = "#AAB7C6"
+READ_CHECK = "#6ED8A0"
 
-# Статусы
-ONLINE = '#10B981'            # Онлайн (зелёный)
-OFFLINE = '#4B5563'           # Офлайн (серый)
-UNREAD_BADGE = '#EF4444'      # Непрочитанные (красный)
-DELIVERED_CHECK = '#6B6B6B'   # Доставлено
-READ_CHECK = '#10B981'        # Прочитано
+DIVIDER = "#22303C"
+INPUT_BORDER = "#2A3947"
+INPUT_BORDER_FOCUS = "#4C9EEB"
 
-# Границы и разделители
-DIVIDER = '#2A2A2A'           # Разделители
-INPUT_BORDER = '#333333'      # Рамка полей
-INPUT_BORDER_FOCUS = '#7C3AED' # Рамка при фокусе
+ICON_DEFAULT = "#9FB0C2"
+ICON_HOVER = "#F4F7FA"
+ICON_ACTIVE = "#4C9EEB"
 
-# Иконки
-ICON_DEFAULT = '#9CA3AF'      # Иконки по умолчанию
-ICON_HOVER = '#FFFFFF'        # Иконки при наведении
-ICON_ACTIVE = '#7C3AED'       # Активные иконки
+SUCCESS = "#35C98A"
+ERROR = "#EF5A5A"
+WARNING = "#F4B35A"
 
-# Системные
-SUCCESS = '#10B981'           # Успех
-ERROR = '#EF4444'             # Ошибка
-WARNING = '#F59E0B'           # Предупреждение
-
-
-# ============================================================================
-# СВЕТЛАЯ ТЕМА
-# ============================================================================
-
+# Light theme
 LIGHT_COLORS = {
-    'bg_primary': '#FFFFFF',
-    'bg_secondary': '#F8F9FA',
-    'bg_tertiary': '#E9ECEF',
-    'text_primary': '#1A1A1A',
-    'text_secondary': '#6B7280',
-    'text_tertiary': '#9CA3AF',
-    'message_other_bg': '#F3F4F6',
-    'divider': '#E5E7EB',
-    'input_border': '#D1D5DB',
+    "bg_primary": "#F5F7FB",
+    "bg_secondary": "#FFFFFF",
+    "bg_tertiary": "#EEF3F8",
+    "accent_primary": "#4C9EEB",
+    "accent_hover": "#63ABF1",
+    "accent_pressed": "#3D8BDA",
+    "text_primary": "#13202C",
+    "text_secondary": "#657586",
+    "text_tertiary": "#8C99A6",
+    "message_own_bg": "#4C9EEB",
+    "message_other_bg": "#EAF1F7",
+    "online": "#35C98A",
+    "offline": "#9CA8B5",
+    "divider": "#DCE5EE",
+    "input_border": "#D2DCE6",
+    "input_border_focus": "#4C9EEB",
+    "icon_default": "#738395",
+    "icon_hover": "#13202C",
+    "icon_active": "#4C9EEB",
+    "success": "#35C98A",
+    "error": "#EF5A5A",
+    "warning": "#F4B35A",
+    "read_check": "#35C98A",
+    "delivered_check": "#7F8FA0",
 }

@@ -1,4 +1,5 @@
 """Contact row widget."""
+
 from __future__ import annotations
 
 from PyQt6.QtCore import QSize, Qt
@@ -12,18 +13,21 @@ from src.utils.helpers import format_time, truncate
 
 
 class ContactItem(QWidget):
-    def __init__(self, user, last_message="", unread_count=0, timestamp=None, parent=None):
+    def __init__(self, user, last_message="", unread_count=0, timestamp=None, is_pinned=False, parent=None):
         super().__init__(parent)
         self.user = user
         self.last_message = last_message
         self.unread_count = unread_count
         self.timestamp = timestamp
-        self.colors = get_theme_colors()
+        self.is_pinned = is_pinned
+        self.colors = get_theme_colors(getattr(self.user, "theme", None))
+        self.unread_badge = None
         self.init_ui()
 
     def init_ui(self):
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setContentsMargins(14, 12, 14, 12)
         layout.setSpacing(12)
 
         self.avatar = AvatarWidget(self.user.name, self.user.avatar_url)
@@ -33,68 +37,76 @@ class ContactItem(QWidget):
         info_layout.setSpacing(4)
 
         top_row = QHBoxLayout()
-        name_label = QLabel(self.user.name)
-        name_label.setFont(QFont(FONT_FAMILY, 14, QFont.Weight.Bold))
-        name_label.setStyleSheet(f"color: {self.colors['text_primary']};")
-        top_row.addWidget(name_label)
+        self.name_label = QLabel(self.user.name)
+        self.name_label.setFont(QFont(FONT_FAMILY, 14, QFont.Weight.Bold))
+        top_row.addWidget(self.name_label)
         top_row.addStretch()
 
         self.time_label = QLabel(format_time(self.timestamp) if self.timestamp else "")
-        self.time_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 11px;")
         top_row.addWidget(self.time_label)
         info_layout.addLayout(top_row)
 
         bottom_row = QHBoxLayout()
-        self.message_label = QLabel(truncate(self.last_message or "Нет сообщений", 35))
-        self.message_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 13px;")
+        bottom_row.setSpacing(8)
+        self.message_label = QLabel(truncate(self.last_message or "Нет сообщений", 36))
         self.message_label.setWordWrap(True)
         bottom_row.addWidget(self.message_label, 1)
 
-        if self.unread_count > 0:
-            badge = QLabel(str(self.unread_count))
-            badge.setFixedSize(22, 22)
-            badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            badge.setStyleSheet(
-                """
-                QLabel {
-                    background-color: #EF4444;
-                    color: white;
-                    border-radius: 11px;
-                    font-size: 11px;
-                    font-weight: 700;
-                }
-                """
-            )
-            bottom_row.addWidget(badge)
+        self.unread_badge = QLabel()
+        self.unread_badge.setFixedSize(22, 22)
+        self.unread_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.unread_badge.setStyleSheet(
+            "QLabel { background-color: #EF5A5A; color: white; border-radius: 11px; font-size: 11px; font-weight: 700; }"
+        )
+        bottom_row.addWidget(self.unread_badge)
         info_layout.addLayout(bottom_row)
         layout.addLayout(info_layout, 1)
 
         self.online_dot = QLabel()
         self.online_dot.setFixedSize(12, 12)
-        self.update_status(self.user.status)
         layout.addWidget(self.online_dot)
+
+        self.refresh_style()
+        self.update_preview(self.last_message, self.timestamp, self.unread_count)
+        self.update_status(self.user.status)
+
+    def refresh_style(self):
+        self.colors = get_theme_colors(getattr(self.user, "theme", None))
+        card_bg = "#1E2935" if self.is_pinned else "transparent"
+        self.setStyleSheet(
+            f"""
+            QWidget {{
+                background-color: {card_bg};
+                border-radius: 20px;
+            }}
+            QLabel {{
+                background-color: transparent;
+                border: none;
+            }}
+            """
+        )
+        self.name_label.setStyleSheet(f"color: {self.colors['text_primary']};")
+        self.time_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 11px;")
+        self.message_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 13px;")
 
     def update_preview(self, last_message="", timestamp=None, unread_count=0):
         self.last_message = last_message
         self.timestamp = timestamp
         self.unread_count = unread_count
-        self.message_label.setText(truncate(self.last_message or "Нет сообщений", 35))
+        self.message_label.setText(truncate(self.last_message or "Нет сообщений", 36))
         self.time_label.setText(format_time(self.timestamp) if self.timestamp else "")
+        self.unread_badge.setVisible(self.unread_count > 0)
+        if self.unread_count > 0:
+            self.unread_badge.setText(str(self.unread_count))
 
     def update_status(self, status):
         if status == "online":
             self.online_dot.setStyleSheet(
-                f"""
-                QLabel {{
-                    background-color: {self.colors['online']};
-                    border: 2px solid {self.colors['bg_secondary']};
-                    border-radius: 6px;
-                }}
-                """
+                f"QLabel {{ background-color: {self.colors['online']}; border: 2px solid {self.colors['bg_secondary']}; border-radius: 6px; }}"
             )
             self.online_dot.show()
         else:
             self.online_dot.hide()
 
     def sizeHint(self):
-        return QSize(280, 70)
+        return QSize(300, 76)

@@ -1,5 +1,82 @@
 {
-  "users": {},
+  "users": {
+    "test_user": {
+      "uid": "test_user",
+      "phone": "+79990000000",
+      "name": "Тестовый",
+      "username": "",
+      "bio": "",
+      "theme": "Светлая",
+      "status": "online",
+      "last_seen": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:59:59.576585"
+      }
+    },
+    "user-e95d23f5e58c": {
+      "uid": "user-e95d23f5e58c",
+      "name": "УЦУЦУ",
+      "phone": "+44444444444",
+      "username": "",
+      "status": "offline",
+      "avatar_url": "",
+      "bio": "",
+      "theme": "dark",
+      "is_group": false
+    },
+    "group-26e5741e25dd": {
+      "uid": "group-26e5741e25dd",
+      "name": "АУУАУ",
+      "phone": "",
+      "username": "",
+      "status": "online",
+      "avatar_url": "",
+      "bio": "Группа",
+      "theme": "dark",
+      "is_group": true,
+      "member_uids": [
+        "test_user",
+        "6b2013e2",
+        "kbs12h3Xv5lcBicUfGpQ"
+      ]
+    },
+    "group-69fb72081dd0": {
+      "uid": "group-69fb72081dd0",
+      "name": "УУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУУ",
+      "phone": "",
+      "username": "",
+      "status": "online",
+      "avatar_url": "",
+      "bio": "Группа",
+      "theme": "dark",
+      "is_group": true,
+      "member_uids": [
+        "test_user",
+        "KQX3OgjIhpbb3f01B6eB",
+        "kbs12h3Xv5lcBicUfGpQ"
+      ]
+    },
+    "user-8f2073f3a8ad": {
+      "uid": "user-8f2073f3a8ad",
+      "phone": "73333333333",
+      "name": "ЛЕВ",
+      "surname": "АУУАУ",
+      "username": "ffffff",
+      "full_name": "ЛЕВ АУУАУ",
+      "avatar_url": "",
+      "status": "online",
+      "last_seen": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:56:27.686416"
+      },
+      "theme": "system",
+      "bio": "",
+      "created_at": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:56:27.155716"
+      }
+    }
+  },
   "messages": [
     {
       "id": "5b27e005-7a48-4069-b4dd-f4e98301309c",
@@ -125,6 +202,403 @@
       "disappears_at": null,
       "reactions": {},
       "poll_options": []
+    },
+    {
+      "id": "5fbd8744-4cfd-46d5-96a6-ec792461d5c0",
+      "from_uid": "user-8db6922d0b44",
+      "to_uid": "6b2013e2",
+      "text": "ffefef",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T01:54:50.342298"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": false,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "8d5b3540-3f0e-415e-82ef-f47dc230c1dd",
+      "from_uid": "user-8db6922d0b44",
+      "to_uid": "6b2013e2",
+      "text": "efefef",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T01:55:02.960518"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "5fbd8744-4cfd-46d5-96a6-ec792461d5c0",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": false,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {
+        "😂": [
+          "user-8db6922d0b44"
+        ]
+      },
+      "poll_options": []
+    },
+    {
+      "id": "10c9559b-a99c-4351-bc25-38c89f58c329",
+      "from_uid": "user-8db6922d0b44",
+      "to_uid": "6b2013e2",
+      "text": "Сообщение удалено",
+      "message_type": "photo",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T01:58:34.876534"
+      },
+      "status": "sent",
+      "file_url": "C:/Users/levas/Downloads/Telegram Desktop/image_2026-03-20_00-35-11.png",
+      "file_name": "image_2026-03-20_00-35-11.png",
+      "file_size": 257362,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": true,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "57d41d74-89d7-4a22-bcc7-17ea2cd36a2b",
+      "from_uid": "test_user",
+      "to_uid": "test_user_20260318_175528",
+      "text": "ggggggggg",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:07:02.488728"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": false,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "86d2bafe-2c75-42da-b44a-a6b5bed60461",
+      "from_uid": "test_user",
+      "to_uid": "kbs12h3Xv5lcBicUfGpQ",
+      "text": "Сообщение удалено",
+      "message_type": "photo",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:08:30.463595"
+      },
+      "status": "sent",
+      "file_url": "C:/Users/levas/Downloads/Telegram Desktop/image_2026-03-20_00-35-11.png",
+      "file_name": "image_2026-03-20_00-35-11.png",
+      "file_size": 257362,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": true,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "5ef8146f-1766-4e32-a81c-e48c287fd778",
+      "from_uid": "test_user",
+      "to_uid": "test_user_20260318_175528",
+      "text": "",
+      "message_type": "photo",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:13:24.585437"
+      },
+      "status": "sent",
+      "file_url": "C:/Users/levas/Downloads/Telegram Desktop/image (3).png",
+      "file_name": "image (3).png",
+      "file_size": 48994,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": false,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {
+        "😂": [
+          "test_user"
+        ]
+      },
+      "poll_options": []
+    },
+    {
+      "id": "cbdba565-f6be-497b-938c-7dedde01b540",
+      "from_uid": "test_user",
+      "to_uid": "nHNiX1q9Ws5Zom4vHNtU",
+      "text": "ggggggggg",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:15:29.409922"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": false,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "42735621-03c4-42ec-b26e-c3e3bb7f5200",
+      "from_uid": "test_user",
+      "to_uid": "nHNiX1q9Ws5Zom4vHNtU",
+      "text": "",
+      "message_type": "photo",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:15:29.411694"
+      },
+      "status": "sent",
+      "file_url": "C:/Users/levas/Downloads/Telegram Desktop/image (3).png",
+      "file_name": "image (3).png",
+      "file_size": 48994,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "is_deleted": false,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "59755025-4591-4906-b418-afc74cc51b9e",
+      "from_uid": "user-23abff890aac",
+      "to_uid": "test_user_20260318_175528",
+      "text": "папап",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:32:24.394747"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {
+        "😮": [
+          "user-23abff890aac"
+        ],
+        "😡": [
+          "user-23abff890aac"
+        ],
+        "❤️": [
+          "user-23abff890aac"
+        ],
+        "👍": [
+          "user-23abff890aac"
+        ]
+      },
+      "poll_options": []
+    },
+    {
+      "id": "f510de2a-f291-4f74-9de7-87dc13a70048",
+      "from_uid": "user-23abff890aac",
+      "to_uid": "kbs12h3Xv5lcBicUfGpQ",
+      "text": "папап",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:32:55.594947"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "user-23abff890aac",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "bf5f8582-45a9-4418-b5be-5eabc16f0a7e",
+      "from_uid": "user-23abff890aac",
+      "to_uid": "test_user_20260318_175528",
+      "text": "",
+      "message_type": "photo",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:33:12.002765"
+      },
+      "status": "sent",
+      "file_url": "C:/Users/levas/Downloads/Telegram Desktop/image (4).png",
+      "file_name": "image (4).png",
+      "file_size": 60597,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "bc1bb5c9-0163-4168-80af-d922167a00e6",
+      "from_uid": "test_user",
+      "to_uid": "user-e95d23f5e58c",
+      "text": "УУКУКУК",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:46:24.568385"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "3525a6f3-2096-44c5-9096-34372aafeb25",
+      "from_uid": "test_user",
+      "to_uid": "user-8db6922d0b44",
+      "text": "ВУУВУ",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:49:46.075359"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {
+        "😂": [
+          "test_user"
+        ]
+      },
+      "poll_options": []
+    },
+    {
+      "id": "812f1801-2b4d-41a7-a090-e07a6c612548",
+      "from_uid": "test_user",
+      "to_uid": "group-26e5741e25dd",
+      "text": "ВУУВУ",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:49:58.177544"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "b3eb6f22-38a5-4d58-84e7-fc3ad76feb3c",
+      "from_uid": "test_user",
+      "to_uid": "user-e95d23f5e58c",
+      "text": "ВУУВУ",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-20T02:50:04.865189"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {
+        "❤️": [
+          "test_user"
+        ]
+      },
+      "poll_options": []
     }
   ],
   "settings": {
@@ -160,7 +634,66 @@
       "push": true,
       "preview": true,
       "dnd": false
+    },
+    "user-23abff890aac": {
+      "name": "frfr",
+      "username": "frf",
+      "bio": "ВВУВУВ",
+      "theme": "dark",
+      "font_scale": 15,
+      "sound": true,
+      "push": true,
+      "preview": true,
+      "dnd": false,
+      "shortcuts": {
+        "send": "Ctrl+Return",
+        "search": "Ctrl+F",
+        "new_chat": "Ctrl+N",
+        "mute": "Ctrl+Shift+M",
+        "escape": "Esc"
+      }
+    },
+    "user-8f2073f3a8ad": {
+      "name": "ЛЕВ",
+      "username": "ffffff",
+      "bio": "",
+      "theme": "system",
+      "font_scale": 15,
+      "sound": true,
+      "push": true,
+      "preview": true,
+      "dnd": false,
+      "shortcuts": {
+        "send": "Ctrl+Return",
+        "search": "Ctrl+F",
+        "new_chat": "Ctrl+N",
+        "escape": "Esc"
+      }
     }
   },
-  "pinned_messages": {}
+  "pinned_messages": {},
+  "pinned_chats": {
+    "test_user": [
+      "user-6aa2a8a49695",
+      "user-8db6922d0b44"
+    ],
+    "user-23abff890aac": [
+      "user-8db6922d0b44"
+    ]
+  },
+  "archived_chats": {
+    "test_user": [
+      "user-6aa2a8a49695"
+    ]
+  },
+  "deleted_chats": {
+    "test_user": [
+      "test_user_20260318_175528"
+    ]
+  },
+  "muted_chats": {
+    "user-23abff890aac": [
+      "user-8db6922d0b44"
+    ]
+  }
 }

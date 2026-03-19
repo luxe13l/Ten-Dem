@@ -1,8 +1,11 @@
 """Main messenger window."""
+
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QFont, QIcon
+import uuid
+
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QFont, QIcon, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -10,20 +13,24 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
+from src.database.local_store import load_store, save_store
 from src.database.messages_db import get_chat_summaries
-from src.database.users_db import get_all_users, set_online_status
+from src.database.users_db import create_user, get_all_users, set_online_status
 from src.models.user import User
 from src.styles import FONT_FAMILY, LEFT_PANEL_WIDTH, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH
 from src.styles.themes import get_theme_colors
+from src.ui.chat_creation_dialogs import CreateContactDialog, CreateGroupDialog
 from src.ui.chat_widget import ChatWidget
-from src.ui.contact_item import ContactItem
 from src.ui.contact_info_dialog import ContactInfoDialog
-from src.ui.settings_window import SettingsWindow
+from src.ui.contact_item import ContactItem
+from src.ui.settings_window import DEFAULT_SHORTCUTS, SettingsWindow
 
 
 class MainWindow(QMainWindow):
@@ -34,8 +41,15 @@ class MainWindow(QMainWindow):
         self.current_chat_widget = None
         self.settings_window = None
         self.contact_widgets = {}
+        self.shortcuts_map = self._load_shortcuts()
+        self._shortcuts: list[QShortcut] = []
         self.init_ui()
+        self._bind_shortcuts()
         set_online_status(self.current_user.uid, "online")
+
+    def _load_shortcuts(self):
+        settings = load_store().get("settings", {}).get(self.current_user.uid, {})
+        return {**DEFAULT_SHORTCUTS, **settings.get("shortcuts", {})}
 
     def init_ui(self):
         self.setWindowTitle(f"Ten Dem | {self.current_user.name}")
@@ -48,16 +62,13 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-
         layout.addWidget(self._create_sidebar())
         layout.addWidget(self._create_right_panel(), 1)
 
     def _create_sidebar(self):
         panel = QWidget()
         panel.setFixedWidth(LEFT_PANEL_WIDTH)
-        panel.setStyleSheet(
-            f"QWidget {{ background-color: {self.colors['bg_secondary']}; border-right: 1px solid {self.colors['divider']}; }}"
-        )
+        panel.setStyleSheet(f"QWidget {{ background-color: {self.colors['bg_secondary']}; }}")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -66,7 +77,7 @@ class MainWindow(QMainWindow):
         header.setContentsMargins(20, 20, 20, 16)
         title = QLabel("Ten Dem")
         title.setFont(QFont(FONT_FAMILY, 20, QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {self.colors['text_primary']};")
+        title.setStyleSheet(f"color: {self.colors['text_primary']}; background: transparent;")
         header.addWidget(title)
         header.addStretch()
 
@@ -78,15 +89,10 @@ class MainWindow(QMainWindow):
             f"""
             QPushButton {{
                 background-color: transparent;
-                color: {self.colors['icon_default']};
                 border: none;
                 border-radius: 12px;
-                font-size: 18px;
             }}
-            QPushButton:hover {{
-                background-color: {self.colors['bg_tertiary']};
-                color: {self.colors['text_primary']};
-            }}
+            QPushButton:hover {{ background-color: {self.colors['bg_tertiary']}; }}
             """
         )
         settings_btn.clicked.connect(self.open_settings)
@@ -101,7 +107,7 @@ class MainWindow(QMainWindow):
             QLineEdit {{
                 margin: 0 16px 16px 16px;
                 padding: 12px 16px;
-                border: 1px solid {self.colors['divider']};
+                border: none;
                 border-radius: 18px;
                 background-color: {self.colors['bg_tertiary']};
                 color: {self.colors['text_primary']};
@@ -121,20 +127,40 @@ class MainWindow(QMainWindow):
                 background-color: transparent;
                 border: none;
                 outline: none;
+                padding: 0 8px 0 8px;
             }}
             QListWidget::item {{
-                margin: 0 8px 6px 8px;
-                border-radius: 14px;
+                margin: 0 0 8px 0;
+                border-radius: 18px;
+                background: transparent;
             }}
-            QListWidget::item:selected {{
-                background-color: {self.colors['bg_tertiary']};
-            }}
-            QListWidget::item:hover {{
-                background-color: {self.colors['bg_tertiary']};
-            }}
+            QListWidget::item:selected {{ background-color: transparent; }}
+            QListWidget::item:hover {{ background-color: transparent; }}
             """
         )
         layout.addWidget(self.contacts_list, 1)
+
+        bottom = QHBoxLayout()
+        bottom.setContentsMargins(18, 0, 18, 24)
+        bottom.addStretch()
+        self.new_chat_button = QPushButton("+")
+        self.new_chat_button.setFixedSize(54, 54)
+        self.new_chat_button.setStyleSheet(
+            f"""
+            QPushButton {{
+                background-color: {self.colors['accent_primary']};
+                color: white;
+                border: none;
+                border-radius: 27px;
+                font-size: 28px;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{ background-color: {self.colors['accent_hover']}; }}
+            """
+        )
+        self.new_chat_button.clicked.connect(self.open_create_menu)
+        bottom.addWidget(self.new_chat_button, 0, Qt.AlignmentFlag.AlignBottom)
+        layout.addLayout(bottom)
         return panel
 
     def _create_right_panel(self):
@@ -145,27 +171,112 @@ class MainWindow(QMainWindow):
         self.placeholder = QWidget()
         placeholder_layout = QVBoxLayout(self.placeholder)
         placeholder_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon = QLabel("TD")
-        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon.setFixedSize(96, 96)
-        icon.setStyleSheet(
-            f"""
-            QLabel {{
-                background-color: {self.colors['accent_primary']};
-                color: white;
-                border-radius: 48px;
-                font-size: 30px;
-                font-weight: 700;
-            }}
-            """
-        )
         text = QLabel("Выберите чат, чтобы начать общение")
-        text.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 18px;")
-        placeholder_layout.addWidget(icon)
-        placeholder_layout.addSpacing(18)
+        text.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 18px; background: transparent;")
         placeholder_layout.addWidget(text)
         right_layout.addWidget(self.placeholder)
         return self.right_panel
+
+    def _bind_shortcuts(self):
+        for shortcut in self._shortcuts:
+            shortcut.deleteLater()
+        self._shortcuts = []
+        bindings = {
+            "search": self.focus_search,
+            "new_chat": self.open_create_menu,
+            "escape": self.handle_escape,
+        }
+        for key, handler in bindings.items():
+            sequence = self.shortcuts_map.get(key)
+            if not sequence:
+                continue
+            shortcut = QShortcut(QKeySequence(sequence), self)
+            shortcut.activated.connect(handler)
+            self._shortcuts.append(shortcut)
+
+    def focus_search(self):
+        self.search_input.setFocus()
+        self.search_input.selectAll()
+
+    def open_create_menu(self):
+        menu = QMenu(self)
+        menu.setStyleSheet(self._menu_style())
+        contact_action = menu.addAction("Создать контакт")
+        group_action = menu.addAction("Создать группу")
+        anchor = self.new_chat_button.mapToGlobal(self.new_chat_button.rect().topLeft())
+        action = menu.exec(anchor)
+        if action == contact_action:
+            self.create_contact()
+        elif action == group_action:
+            self.create_group()
+
+    def create_contact(self):
+        dialog = CreateContactDialog(self)
+        if dialog.exec() != dialog.DialogCode.Accepted or not dialog.payload:
+            return
+        payload = dialog.payload
+        uid = create_user(
+            {
+                "uid": f"user-{uuid.uuid4().hex[:12]}",
+                "name": payload["name"],
+                "phone": payload["phone"],
+                "username": "",
+                "status": "offline",
+                "avatar_url": "",
+                "bio": "",
+                "theme": "dark",
+                "is_group": False,
+            }
+        )
+        self.load_contacts()
+        self._open_chat_by_uid(uid)
+
+    def create_group(self):
+        users = [user for user in get_all_users() if user.get("uid") != self.current_user.uid and not user.get("is_group")]
+        dialog = CreateGroupDialog(users, self)
+        if dialog.exec() != dialog.DialogCode.Accepted or not dialog.payload:
+            return
+        payload = dialog.payload
+        uid = create_user(
+            {
+                "uid": f"group-{uuid.uuid4().hex[:12]}",
+                "name": payload["name"],
+                "phone": "",
+                "username": "",
+                "status": "online",
+                "avatar_url": "",
+                "bio": "Группа",
+                "theme": "dark",
+                "is_group": True,
+                "member_uids": [self.current_user.uid, *payload["member_uids"]],
+            }
+        )
+        self.load_contacts()
+        self._open_chat_by_uid(uid)
+
+    def _open_chat_by_uid(self, target_uid: str):
+        for index in range(self.contacts_list.count()):
+            item = self.contacts_list.item(index)
+            widget = self.contacts_list.itemWidget(item)
+            if widget and widget.user.uid == target_uid:
+                self.contacts_list.setCurrentItem(item)
+                self.open_chat(item)
+                return
+
+    def handle_escape(self):
+        if self.settings_window and self.settings_window.isVisible():
+            self.settings_window.reject()
+            return
+        if self.current_chat_widget:
+            self.current_chat_widget.deleteLater()
+            self.current_chat_widget = None
+            self.placeholder = QWidget()
+            placeholder_layout = QVBoxLayout(self.placeholder)
+            placeholder_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            text = QLabel("Выберите чат, чтобы начать общение")
+            text.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 18px; background: transparent;")
+            placeholder_layout.addWidget(text)
+            self.right_panel.layout().addWidget(self.placeholder)
 
     def open_settings(self):
         self.settings_window = SettingsWindow(self.current_user, self)
@@ -174,7 +285,10 @@ class MainWindow(QMainWindow):
 
     def on_settings_saved(self, settings):
         self.current_user.name = settings.get("name", self.current_user.name)
+        self.current_user.username = settings.get("username", getattr(self.current_user, "username", ""))
+        self.current_user.bio = settings.get("bio", getattr(self.current_user, "bio", ""))
         self.current_user.theme = settings.get("theme", getattr(self.current_user, "theme", "dark"))
+        self.shortcuts_map = {**DEFAULT_SHORTCUTS, **settings.get("shortcuts", {})}
         self.colors = get_theme_colors(self.current_user.theme)
         self.setWindowTitle(f"Ten Dem | {self.current_user.name}")
         old = self.takeCentralWidget()
@@ -182,20 +296,30 @@ class MainWindow(QMainWindow):
             old.deleteLater()
         self.init_ui()
         self.load_contacts()
+        self._bind_shortcuts()
 
     def load_contacts(self):
         self.contacts_list.clear()
         self.contact_widgets.clear()
         summaries = get_chat_summaries(self.current_user.uid)
+        store = load_store()
+        pinned = set(store.get("pinned_chats", {}).get(self.current_user.uid, []))
+        archived = set(store.get("archived_chats", {}).get(self.current_user.uid, []))
+        deleted = set(store.get("deleted_chats", {}).get(self.current_user.uid, []))
         all_users = get_all_users()
-        if not all_users:
-            all_users = [
-                {"uid": "demo-alex", "name": "Алексей", "phone": "+79991111111", "status": "online"},
-                {"uid": "demo-maria", "name": "Мария", "phone": "+79992222222", "status": "offline"},
-            ]
-        for user_data in all_users:
-            if user_data.get("uid") == self.current_user.uid:
-                continue
+        visible_users = [
+            user
+            for user in all_users
+            if user.get("uid") != self.current_user.uid and user.get("uid") not in archived and user.get("uid") not in deleted
+        ]
+        visible_users.sort(
+            key=lambda user: (
+                0 if user.get("uid") in pinned else 1,
+                -(summaries.get(user.get("uid"), {}).get("timestamp").timestamp() if summaries.get(user.get("uid"), {}).get("timestamp") else 0),
+                (user.get("name") or "").lower(),
+            )
+        )
+        for user_data in visible_users:
             user = User.from_dict(user_data, user_data.get("uid"))
             summary = summaries.get(user.uid, {})
             item = QListWidgetItem()
@@ -204,6 +328,7 @@ class MainWindow(QMainWindow):
                 last_message=summary.get("last_message", "Начните разговор"),
                 unread_count=summary.get("unread_count", 0),
                 timestamp=summary.get("timestamp"),
+                is_pinned=user.uid in pinned,
             )
             item.setSizeHint(widget.sizeHint())
             self.contacts_list.addItem(item)
@@ -216,7 +341,8 @@ class MainWindow(QMainWindow):
             item = self.contacts_list.item(index)
             widget = self.contacts_list.itemWidget(item)
             name = getattr(getattr(widget, "user", None), "name", "").lower()
-            item.setHidden(text not in name)
+            username = getattr(getattr(widget, "user", None), "username", "").lower()
+            item.setHidden(text not in name and text not in username)
 
     def open_chat(self, item: QListWidgetItem):
         contact_widget = self.contacts_list.itemWidget(item)
@@ -227,18 +353,16 @@ class MainWindow(QMainWindow):
             self.placeholder = None
         if self.current_chat_widget is not None:
             self.current_chat_widget.deleteLater()
-        self.current_chat_widget = ChatWidget(self.current_user, contact_widget.user, self.right_panel)
+        self.current_chat_widget = ChatWidget(self.current_user, contact_widget.user, shortcuts_map=self.shortcuts_map, parent=self.right_panel)
         self.current_chat_widget.chat_updated.connect(self.refresh_contacts)
         self.right_panel.layout().addWidget(self.current_chat_widget)
 
-    def refresh_contacts(self, _contact_uid: str = ""):
-        if not _contact_uid or _contact_uid not in self.contact_widgets:
+    def refresh_contacts(self, contact_uid: str = ""):
+        if not contact_uid or contact_uid not in self.contact_widgets:
             self.load_contacts()
             return
-        from src.database.messages_db import get_chat_summaries
-
-        summary = get_chat_summaries(self.current_user.uid).get(_contact_uid, {})
-        widget = self.contact_widgets.get(_contact_uid)
+        summary = get_chat_summaries(self.current_user.uid).get(contact_uid, {})
+        widget = self.contact_widgets.get(contact_uid)
         if widget:
             widget.update_preview(
                 last_message=summary.get("last_message", widget.last_message),
@@ -253,23 +377,81 @@ class MainWindow(QMainWindow):
         widget = self.contacts_list.itemWidget(item)
         if not widget:
             return
-        from PyQt6.QtWidgets import QMenu
-
         menu = QMenu(self)
-        menu.setStyleSheet(
-            f"""
-            QMenu {{ background-color: {self.colors['bg_secondary']}; color: {self.colors['text_primary']}; border: 1px solid {self.colors['divider']}; }}
-            QMenu::item {{ padding: 8px 16px; }}
-            QMenu::item:selected {{ background-color: {self.colors['bg_tertiary']}; }}
-            """
-        )
+        menu.setStyleSheet(self._menu_style())
         info_action = menu.addAction("Информация о контакте")
         open_action = menu.addAction("Открыть чат")
+        store = load_store()
+        pinned = set(store.get("pinned_chats", {}).get(self.current_user.uid, []))
+        archived = set(store.get("archived_chats", {}).get(self.current_user.uid, []))
+        pin_action = menu.addAction("Открепить чат" if widget.user.uid in pinned else "Закрепить чат")
+        archive_action = menu.addAction("Вернуть из архива" if widget.user.uid in archived else "Архивировать чат")
+        delete_action = menu.addAction("Удалить чат")
         action = menu.exec(self.contacts_list.mapToGlobal(pos))
         if action == open_action:
             self.open_chat(item)
         elif action == info_action:
             ContactInfoDialog(self.current_user, widget.user, self).exec()
+        elif action == pin_action:
+            self.toggle_pin_chat(widget.user.uid)
+        elif action == archive_action:
+            self.toggle_archive_chat(widget.user.uid)
+        elif action == delete_action:
+            self.delete_chat(widget.user.uid)
+
+    def toggle_pin_chat(self, chat_uid: str):
+        store = load_store()
+        pinned = set(store.get("pinned_chats", {}).get(self.current_user.uid, []))
+        if chat_uid in pinned:
+            pinned.remove(chat_uid)
+        else:
+            pinned.add(chat_uid)
+        store.setdefault("pinned_chats", {})[self.current_user.uid] = sorted(pinned)
+        save_store(store)
+        self.load_contacts()
+
+    def toggle_archive_chat(self, chat_uid: str):
+        store = load_store()
+        archived = set(store.get("archived_chats", {}).get(self.current_user.uid, []))
+        if chat_uid in archived:
+            archived.remove(chat_uid)
+        else:
+            archived.add(chat_uid)
+        store.setdefault("archived_chats", {})[self.current_user.uid] = sorted(archived)
+        save_store(store)
+        if self.current_chat_widget and self.current_chat_widget.contact.uid == chat_uid and chat_uid in archived:
+            self.handle_escape()
+        self.load_contacts()
+
+    def delete_chat(self, chat_uid: str):
+        if QMessageBox.question(self, "Удалить чат", "Удалить чат из списка?") != QMessageBox.StandardButton.Yes:
+            return
+        store = load_store()
+        deleted = set(store.get("deleted_chats", {}).get(self.current_user.uid, []))
+        deleted.add(chat_uid)
+        store.setdefault("deleted_chats", {})[self.current_user.uid] = sorted(deleted)
+        save_store(store)
+        if self.current_chat_widget and self.current_chat_widget.contact.uid == chat_uid:
+            self.handle_escape()
+        self.load_contacts()
+
+    def _menu_style(self):
+        return f"""
+        QMenu {{
+            background-color: {self.colors['bg_secondary']};
+            color: {self.colors['text_primary']};
+            border: none;
+            border-radius: 14px;
+            padding: 8px;
+        }}
+        QMenu::item {{
+            padding: 8px 16px;
+            border-radius: 8px;
+        }}
+        QMenu::item:selected {{
+            background-color: {self.colors['bg_tertiary']};
+        }}
+        """
 
     def closeEvent(self, event):
         set_online_status(self.current_user.uid, "offline")

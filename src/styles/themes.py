@@ -102,20 +102,23 @@ def build_app_stylesheet(theme_name: str) -> str:
     accent = theme_manager.get_color("accent_primary")
     return f"""
     QWidget {{
-        background-color: {bg};
         color: {text};
     }}
     QMainWindow, QDialog {{
         background-color: {bg};
     }}
+    QLabel {{
+        background-color: transparent;
+        color: {text};
+    }}
+    QFrame {{
+        background-color: transparent;
+    }}
     QLineEdit, QTextEdit, QComboBox, QListWidget, QScrollArea {{
         background-color: {input_bg};
         color: {text};
-        border-color: {divider};
+        border: none;
         selection-background-color: {accent};
-    }}
-    QLabel {{
-        color: {text};
     }}
     QPushButton {{
         color: {text};
@@ -123,7 +126,8 @@ def build_app_stylesheet(theme_name: str) -> str:
     QMenu {{
         background-color: {panel};
         color: {text};
-        border: 1px solid {divider};
+        border: none;
+        border-radius: 14px;
     }}
     QMenu::item:selected {{
         background-color: {input_bg};

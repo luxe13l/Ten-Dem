@@ -1,4 +1,5 @@
 """User model."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -17,6 +18,8 @@ class User:
         surname="",
         bio="",
         theme="dark",
+        is_group=False,
+        member_uids=None,
     ):
         self.uid = uid
         self.phone = phone
@@ -28,6 +31,8 @@ class User:
         self.surname = surname
         self.bio = bio
         self.theme = theme
+        self.is_group = bool(is_group)
+        self.member_uids = list(member_uids or [])
 
     def to_dict(self):
         return {
@@ -40,6 +45,8 @@ class User:
             "surname": self.surname,
             "bio": self.bio,
             "theme": self.theme,
+            "is_group": self.is_group,
+            "member_uids": self.member_uids,
         }
 
     @staticmethod
@@ -59,6 +66,8 @@ class User:
                 surname=data.get("surname", ""),
                 bio=data.get("bio", ""),
                 theme=data.get("theme", "dark"),
+                is_group=bool(data.get("is_group", False)),
+                member_uids=data.get("member_uids", []) or [],
             )
         except Exception:
             return User(uid="", phone="", name="Неизвестный")
@@ -66,12 +75,12 @@ class User:
     def get_online_status(self):
         try:
             if self.status == "online":
-                return "online"
+                return "в сети"
             if not self.last_seen:
-                return "был(а) давно"
+                return "был давно"
             if datetime.now() - self.last_seen < timedelta(minutes=5):
-                return "был(а) недавно"
-            return f"был(а) {self.last_seen.strftime('%d.%m %H:%M')}"
+                return "был недавно"
+            return f"был {self.last_seen.strftime('%d.%m %H:%M')}"
         except Exception:
             return "offline"
 
