@@ -4,15 +4,17 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QLineEdit, QPushButton, QStackedWidget, 
                              QFrame, QProgressBar)
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
+
 from src.database.auth_manager import auth_manager
+from src.ui.legal_agreement import LegalAgreementWindow
 
 
 # ==================== ЭТАП 1: ТЕЛЕФОН (РЕГИСТРАЦИЯ) ====================
 class PhoneStep(QWidget):
     next_step = pyqtSignal(str)
-    go_to_login = pyqtSignal()  # Сигнал для перехода к входу
+    go_to_login = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -69,7 +71,6 @@ class PhoneStep(QWidget):
         self.register_btn.clicked.connect(self.on_register)
         main_layout.addWidget(self.register_btn)
         
-        # Текст "Войти"
         login_layout = QHBoxLayout()
         login_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         login_label = QLabel("Уже есть аккаунт?")
@@ -134,7 +135,7 @@ class PhoneStep(QWidget):
 # ==================== ЭТАП 1Б: ТЕЛЕФОН (ВХОД) ====================
 class LoginStep(QWidget):
     next_step = pyqtSignal(str)
-    go_to_registration = pyqtSignal()  # Сигнал для возврата к регистрации
+    go_to_registration = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -198,7 +199,6 @@ class LoginStep(QWidget):
         self.login_btn.clicked.connect(self.on_login)
         main_layout.addWidget(self.login_btn)
         
-        # Текст "Нет аккаунта?"
         register_layout = QHBoxLayout()
         register_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         register_label = QLabel("Нет аккаунта?")
@@ -247,7 +247,7 @@ class LoginStep(QWidget):
 
 # ==================== ЭТАП 2: КОД ====================
 class CodeStep(QWidget):
-    next_step = pyqtSignal(str)  # Теперь передаёт phone + режим
+    next_step = pyqtSignal(str)
     back_step = pyqtSignal()
     
     def __init__(self, parent=None):
@@ -391,7 +391,6 @@ class CodeStep(QWidget):
         success, message, phone = auth_manager.verify_code(self.verification_id, code)
         
         if success:
-            # Передаём телефон + режим (login или register)
             mode = "login" if self.is_login_mode else "register"
             self.next_step.emit(f"{mode}:{phone}")
         else:
@@ -538,9 +537,6 @@ class NameStep(QWidget):
 
 
 # ==================== ЭТАП 4: USERNAME ====================
-# ==================== ЭТАП 4: USERNAME ====================
-# ==================== ЭТАП 4: USERNAME ====================
-# ==================== ЭТАП 4: USERNAME ====================
 class UsernameStep(QWidget):
     next_step = pyqtSignal(str)
     
@@ -642,37 +638,27 @@ class UsernameStep(QWidget):
         main_layout.addStretch()
     
     def on_username_changed(self, text):
-        # Сбрасываем таймер
         self.username_timer.stop()
-        
-        # Очищаем статус
         self.status_label.setText("")
         self.continue_btn.setEnabled(False)
         
         username = text.strip()
         
-        # Проверяем только если длина 3-20 символов
         if len(username) >= 3 and len(username) <= 20:
-            # Проверяем формат (латиница, цифры, подчеркивание)
             import re
             if re.match(r'^[a-zA-Z0-9_]+$', username):
-                # ✅ Запускаем таймер на 6 секунд (липовая проверка)
-                self.username_timer.start(6000)
+                self.username_timer.start(2000)
     
     def check_username(self):
-        """Липовая проверка — всегда успешно через 6 секунд"""
         username = self.username_input.text().strip()
         
-        # ✅ Показываем что идёт проверка
         self.status_label.setText("⏳ Проверка...")
         self.status_label.setStyleSheet("color: #6B7280; font-size: 12px;")
         self.continue_btn.setEnabled(False)
         
-        # ✅ Через 6 секунд показываем "Доступен"
-        QTimer.singleShot(6000, lambda: self.on_check_complete())
+        QTimer.singleShot(2000, lambda: self.on_check_complete())
     
     def on_check_complete(self):
-        """Показываем что username доступен (всегда успешно)"""
         self.status_label.setText("✓ Доступен")
         self.status_label.setStyleSheet("color: #10B981; font-size: 12px;")
         self.continue_btn.setEnabled(True)
@@ -683,6 +669,7 @@ class UsernameStep(QWidget):
             self.error_label.setText("Введите username")
             return
         self.next_step.emit(username)
+
 
 # ==================== ЭТАП 5: ЗАГРУЗКА (7 СЕКУНД) ====================
 class LoadingStep(QWidget):
@@ -762,6 +749,7 @@ class RegistrationWizard(QWidget):
         self.verification_id = None
         self.user_data = {}
         self.is_login_mode = False
+        self.legal_step = None
         
         self.init_ui()
     
@@ -773,24 +761,26 @@ class RegistrationWizard(QWidget):
         self.stack = QStackedWidget()
         self.stack.setStyleSheet("background-color: transparent;")
         
-        # Создаем все этапы
-        self.phone_step = PhoneStep()  # Регистрация
-        self.login_step = LoginStep()  # Вход
-        self.code_step = CodeStep()
-        self.name_step = NameStep()
-        self.username_step = UsernameStep()
-        self.loading_step = LoadingStep()
+        # ✅ СОЗДАЁМ ВСЕ ЭТАПЫ
+        self.phone_step = PhoneStep()           # Индекс 0
+        self.login_step = LoginStep()           # Индекс 1
+        self.code_step = CodeStep()             # Индекс 2
+        self.name_step = NameStep()             # Индекс 3
+        self.username_step = UsernameStep()     # Индекс 4
+        self.legal_step = None                  # Индекс 5 (создадим позже)
+        self.loading_step = LoadingStep()       # Индекс 5 (пока что)
         
-        self.stack.addWidget(self.phone_step)    # 0 - Регистрация
-        self.stack.addWidget(self.login_step)    # 1 - Вход
-        self.stack.addWidget(self.code_step)     # 2 - Код
-        self.stack.addWidget(self.name_step)     # 3 - Имя
-        self.stack.addWidget(self.username_step) # 4 - Username
-        self.stack.addWidget(self.loading_step)  # 5 - Загрузка
+        # ✅ ДОБАВЛЯЕМ В СТЕК
+        self.stack.addWidget(self.phone_step)        # 0
+        self.stack.addWidget(self.login_step)        # 1
+        self.stack.addWidget(self.code_step)         # 2
+        self.stack.addWidget(self.name_step)         # 3
+        self.stack.addWidget(self.username_step)     # 4
+        self.stack.addWidget(self.loading_step)      # 5 (пока загрузка)
         
         main_layout.addWidget(self.stack)
         
-        # Подключаем сигналы
+        # ✅ ПОДКЛЮЧАЕМ СИГНАЛЫ
         self.phone_step.next_step.connect(self.on_phone_submitted)
         self.phone_step.go_to_login.connect(self.go_to_login)
         
@@ -807,7 +797,6 @@ class RegistrationWizard(QWidget):
         main_layout.addStretch()
     
     def on_phone_submitted(self, phone):
-        """Обработка телефона для регистрации"""
         if phone == "skip":
             self.registration_complete.emit({
                 'uid': 'test_user',
@@ -828,12 +817,11 @@ class RegistrationWizard(QWidget):
             self.code_step.set_phone(phone)
             self.code_step.set_verification_id(verification_id)
             self.code_step.start_timer()
-            self.stack.setCurrentIndex(2)  # Код
+            self.stack.setCurrentIndex(2)
         else:
             self.phone_step.error_label.setText(message)
     
     def on_login_phone_submitted(self, phone):
-        """Обработка телефона для входа"""
         self.phone = phone
         self.is_login_mode = True
         self.code_step.set_login_mode(True)
@@ -845,18 +833,16 @@ class RegistrationWizard(QWidget):
             self.code_step.set_phone(phone)
             self.code_step.set_verification_id(verification_id)
             self.code_step.start_timer()
-            self.stack.setCurrentIndex(2)  # Код
+            self.stack.setCurrentIndex(2)
         else:
             self.login_step.error_label.setText(message)
     
     def on_code_verified(self, result):
-        """Обработка кода"""
         parts = result.split(":")
-        mode = parts[0]  # login или register
+        mode = parts[0]
         phone = parts[1] if len(parts) > 1 else self.phone
         
         if mode == "login":
-            # ✅ ВХОД - загружаем данные и сразу открываем мессенджер
             from src.database.users_db import get_user_by_phone
             user_data = get_user_by_phone(phone)
             if user_data:
@@ -871,19 +857,43 @@ class RegistrationWizard(QWidget):
                 self.code_step.error_label.setText("Аккаунт не найден")
                 return
         else:
-            # ✅ РЕГИСТРАЦИЯ - переходим к вводу имени
-            self.stack.setCurrentIndex(3)  # Имя
+            self.stack.setCurrentIndex(3)
     
     def on_name_submitted(self, data):
         self.user_data.update(data)
-        self.stack.setCurrentIndex(4)  # Username
+        self.stack.setCurrentIndex(4)
     
     def on_username_submitted(self, username):
+        """✅ ОБРАБОТКА USERNAME — ДОБАВЛЯЕМ ЮРИДИЧЕСКИЕ СОГЛАШЕНИЯ"""
+        print(f"📝 Username введён: {username}")
         self.user_data['username'] = username
-        self.stack.setCurrentIndex(5)  # Загрузка
+        
+        # ✅ СОЗДАЁМ ОКНО ЮРИДИЧЕСКИХ СОГЛАШЕНИЙ
+        print("📋 Создаём LegalAgreementWindow...")
+        self.legal_step = LegalAgreementWindow(self.user_data)
+        self.legal_step.completed.connect(self.on_legal_completed)
+        
+        # ✅ ДОБАВЛЯЕМ В СТЕК ПОСЛЕ username_step
+        print("📋 Добавляем legal_step в стек (индекс 5)...")
+        self.stack.insertWidget(5, self.legal_step)
+        
+        # ✅ ПЕРЕКЛЮЧАЕМСЯ НА ЮРИДИЧЕСКИЕ СОГЛАШЕНИЯ
+        print("📋 Переключаемся на индекс 5...")
+        self.stack.setCurrentIndex(5)
+    
+    def on_legal_completed(self):
+        """✅ ПЕРЕХОД К ЗАГРУЗКЕ ПОСЛЕ СОГЛАШЕНИЙ"""
+        print("✅ Юридические соглашения приняты, переход к загрузке...")
+        
+        # Проверяем есть ли loading_step в стеке
+        if self.stack.count() <= 6:
+            self.stack.addWidget(self.loading_step)
+        
+        self.stack.setCurrentIndex(6)
         self.loading_step.start_loading()
     
     def on_loading_finished(self):
+        print("✅ Загрузка завершена, завершаем регистрацию...")
         self.registration_complete.emit({
             'uid': '',
             'phone': self.phone,
@@ -893,16 +903,13 @@ class RegistrationWizard(QWidget):
         })
     
     def go_to_login(self):
-        """Переход к экрану входа"""
         self.stack.setCurrentIndex(1)
     
     def go_to_registration(self):
-        """Переход к экрану регистрации"""
         self.stack.setCurrentIndex(0)
     
     def go_back_from_code(self):
-        """Возврат из кода назад"""
         if self.is_login_mode:
-            self.stack.setCurrentIndex(1)  # Вход
+            self.stack.setCurrentIndex(1)
         else:
-            self.stack.setCurrentIndex(0)  # Регистрация
+            self.stack.setCurrentIndex(0)

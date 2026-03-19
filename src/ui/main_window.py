@@ -12,9 +12,8 @@ from src.database.users_db import get_all_users, set_online_status
 from src.ui.chat_widget import ChatWidget
 from src.ui.contact_item import ContactItem
 
-# ЗАПАСНЫЕ ЦВЕТА (если settings не загрузился)
 try:
-    from src.utils.settings import (
+    from src.styles import (
         COLOR_BACKGROUND, COLOR_PANEL, COLOR_TEXT_PRIMARY, COLOR_DIVIDER,
         FONT_FAMILY, INPUT_BORDER_RADIUS, COLOR_INPUT_BG, COLOR_INPUT_BORDER,
         COLOR_ACCENT
@@ -32,20 +31,20 @@ except ImportError:
 
 
 class MainWindow(QMainWindow):
-    """Главное окно мессенджера."""
-    
     def __init__(self, current_user, parent=None):
         super().__init__(parent)
         self.current_user = current_user
         self.current_chat_widget = None
         self.contacts_list = None
+        self.placeholder_widget = None
+        self.right_panel = None
+        self.settings_window = None
         print(f"🔵 Инициализация MainWindow для {current_user.name}...")
         self.init_ui()
         set_online_status(self.current_user.uid, "online")
         print("✅ MainWindow инициализировано")
     
     def init_ui(self):
-        """Инициализация интерфейса."""
         try:
             self.setWindowTitle(f"Ten Dem — {self.current_user.name}")
             self.setMinimumSize(1200, 800)
@@ -58,7 +57,6 @@ class MainWindow(QMainWindow):
             main_layout.setContentsMargins(0, 0, 0, 0)
             main_layout.setSpacing(0)
             
-            # ЛЕВАЯ ПАНЕЛЬ
             left_panel = QWidget()
             left_panel.setFixedWidth(380)
             left_panel.setStyleSheet(f"""
@@ -89,7 +87,13 @@ class MainWindow(QMainWindow):
                     font-size: 22px;
                     color: {COLOR_TEXT_PRIMARY};
                 }}
+                QPushButton:hover {{
+                    background-color: #2A2A2A;
+                    color: #FFFFFF;
+                    border-radius: 8px;
+                }}
             """)
+            settings_btn.clicked.connect(self.open_settings)
             header.addWidget(settings_btn)
             left_layout.addLayout(header)
             
@@ -126,12 +130,10 @@ class MainWindow(QMainWindow):
                     background-color: {COLOR_DIVIDER};
                 }}
             """)
-            self.contacts_list.itemClicked.connect(self.open_chat)
             left_layout.addWidget(self.contacts_list)
             
             main_layout.addWidget(left_panel)
             
-            # ПРАВАЯ ПАНЕЛЬ
             self.right_panel = QWidget()
             self.right_panel.setStyleSheet(f"background-color: {COLOR_BACKGROUND};")
             right_layout = QVBoxLayout(self.right_panel)
@@ -153,6 +155,8 @@ class MainWindow(QMainWindow):
             right_layout.addWidget(self.placeholder_widget)
             main_layout.addWidget(self.right_panel, 1)
             
+            self.contacts_list.itemClicked.connect(self.open_chat)
+            
             print("✅ UI инициализирован")
             
         except Exception as e:
@@ -161,15 +165,24 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
             raise
     
+    def open_settings(self):
+        """Открывает окно настроек."""
+        from src.ui.settings_window import SettingsWindow
+        self.settings_window = SettingsWindow(self.current_user, self)
+        self.settings_window.settings_saved.connect(self.on_settings_saved)
+        self.settings_window.show()
+    
+    def on_settings_saved(self, settings):
+        """Обрабатывает сохранение настроек."""
+        print(f"✅ Настройки сохранены: {settings}")
+    
     def load_contacts(self):
-        """Загружает контакты с таймаутом 10 секунд (чтобы не висело)."""
         try:
             print("🟢 Загрузка контактов...")
             if self.contacts_list is None:
                 return
             self.contacts_list.clear()
             
-            # ✅ ТАЙМАУТ 10 СЕКУНД
             import threading
             result = [None]
             error = [None]
@@ -184,11 +197,10 @@ class MainWindow(QMainWindow):
             thread = threading.Thread(target=fetch_users)
             thread.daemon = True
             thread.start()
-            thread.join(timeout=10)  # ✅ Ждём максимум 10 секунд
+            thread.join(timeout=10)
             
-            # ✅ Если ошибка или таймаут
             if error[0]:
-                print(f"⚠️ Firebase не ответил за 10 сек: {error[0]}")
+                print(f"⚠️ Firebase не ответил: {error[0]}")
                 self._show_test_contacts()
                 return
             
@@ -206,25 +218,19 @@ class MainWindow(QMainWindow):
                 
                 print(f"✅ Загружено контактов: {len(all_users) - 1}")
             else:
-                print("⚠️ Контакты не загружены, показываем заглушку")
                 self._show_test_contacts()
                 
         except Exception as e:
             print(f"❌ Ошибка load_contacts: {e}")
-            import traceback
-            traceback.print_exc()
             self._show_test_contacts()
     
     def _show_test_contacts(self):
-        """Показывает тестовые контакты если Firebase не работает."""
         print("🧪 Показываем тестовые контакты...")
         
         test_users = [
             {'uid': 'test1', 'name': 'Алексей', 'phone': '+79991111111', 'status': 'online'},
             {'uid': 'test2', 'name': 'Мария', 'phone': '+79992222222', 'status': 'offline'},
             {'uid': 'test3', 'name': 'Дмитрий', 'phone': '+79993333333', 'status': 'online'},
-            {'uid': 'test4', 'name': 'Елена', 'phone': '+79994444444', 'status': 'offline'},
-            {'uid': 'test5', 'name': 'Андрей', 'phone': '+79995555555', 'status': 'online'},
         ]
         
         for user_data in test_users:
@@ -238,7 +244,6 @@ class MainWindow(QMainWindow):
         print(f"✅ Показано тестовых контактов: {len(test_users)}")
     
     def filter_contacts(self, text):
-        """Фильтрует контакты по поиску."""
         try:
             if self.contacts_list is None:
                 return
@@ -251,7 +256,6 @@ class MainWindow(QMainWindow):
             pass
     
     def open_chat(self, item):
-        """Открывает чат с контактом."""
         try:
             contact_widget = self.contacts_list.itemWidget(item)
             if not contact_widget or not hasattr(contact_widget, 'user'):
@@ -259,25 +263,32 @@ class MainWindow(QMainWindow):
             
             contact = contact_widget.user
             
+            if not contact.name:
+                contact.name = "Пользователь"
+            
             if self.placeholder_widget:
                 self.placeholder_widget.deleteLater()
                 self.placeholder_widget = None
             
             if self.current_chat_widget:
-                self.current_chat_widget.deleteLater()
+                try:
+                    self.current_chat_widget.deleteLater()
+                except RuntimeError:
+                    pass
+                self.current_chat_widget = None
             
             self.current_chat_widget = ChatWidget(self.current_user, contact)
             right_layout = self.right_panel.layout()
             right_layout.addWidget(self.current_chat_widget)
             
             print(f"✅ Чат открыт: {contact.name}")
+            
         except Exception as e:
             print(f"❌ Ошибка open_chat: {e}")
             import traceback
             traceback.print_exc()
     
     def closeEvent(self, event):
-        """Обработка закрытия окна."""
         try:
             set_online_status(self.current_user.uid, "offline")
             if self.current_chat_widget:
