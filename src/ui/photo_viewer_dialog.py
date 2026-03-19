@@ -79,7 +79,7 @@ class PhotoViewerDialog(QDialog):
 
         self.content = QFrame()
         self.content.setStyleSheet(
-            f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-radius: 26px; }}"
+            "QFrame { background-color: #242428; border-radius: 40px; }"
         )
         root.addWidget(self.content, 1)
 
@@ -132,13 +132,13 @@ class PhotoViewerDialog(QDialog):
         button.setStyleSheet(
             f"""
             QPushButton {{
-                background-color: {self.colors['bg_tertiary']};
+                background-color: #303036;
                 color: {self.colors['text_primary']};
                 border: none;
-                border-radius: 16px;
+                border-radius: 999px;
                 padding: 10px 14px;
             }}
-            QPushButton:hover {{ background-color: {self.colors['divider']}; }}
+            QPushButton:hover {{ background-color: #3A3A42; }}
             """
         )
         return button
@@ -150,14 +150,14 @@ class PhotoViewerDialog(QDialog):
         button.setStyleSheet(
             f"""
             QPushButton {{
-                background-color: {self.colors['bg_tertiary']};
+                background-color: #303036;
                 color: {self.colors['text_primary']};
                 border: none;
-                border-radius: 24px;
+                border-radius: 999px;
                 font-size: 26px;
                 font-weight: 600;
             }}
-            QPushButton:hover {{ background-color: {self.colors['divider']}; }}
+            QPushButton:hover {{ background-color: #3A3A42; }}
             """
         )
         return button

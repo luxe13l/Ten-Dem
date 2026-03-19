@@ -30,7 +30,7 @@ class ContactInfoDialog(QDialog):
         layout.setSpacing(18)
 
         hero = QFrame()
-        hero.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-radius: 26px; }}")
+        hero.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-radius: 32px; }}")
         hero_layout = QVBoxLayout(hero)
         hero_layout.setContentsMargins(24, 24, 24, 24)
         hero_layout.setSpacing(12)
@@ -66,7 +66,7 @@ class ContactInfoDialog(QDialog):
 
         for title, value in cards:
             card = QFrame()
-            card.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-radius: 20px; }}")
+            card.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-radius: 28px; }}")
             row = QVBoxLayout(card)
             row.setContentsMargins(18, 16, 18, 16)
             row.setSpacing(6)
@@ -81,7 +81,7 @@ class ContactInfoDialog(QDialog):
 
         if self.is_group:
             members_card = QFrame()
-            members_card.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-radius: 20px; }}")
+            members_card.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-radius: 28px; }}")
             members_layout = QVBoxLayout(members_card)
             members_layout.setContentsMargins(18, 16, 18, 16)
             members_layout.setSpacing(8)
@@ -99,13 +99,13 @@ class ContactInfoDialog(QDialog):
         photos = len(get_media_gallery(self.current_user.uid, self.contact.uid, "photo"))
         files = len(get_media_gallery(self.current_user.uid, self.contact.uid, "file"))
         media = QFrame()
-        media.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-radius: 20px; }}")
+        media.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-radius: 28px; }}")
         media_layout = QHBoxLayout(media)
         media_layout.setContentsMargins(18, 16, 18, 16)
         media_layout.setSpacing(12)
         for left, right in [("Фото", str(photos)), ("Файлы", str(files))]:
             block = QFrame()
-            block.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_tertiary']}; border-radius: 16px; }}")
+            block.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_tertiary']}; border-radius: 24px; }}")
             block_layout = QVBoxLayout(block)
             block_layout.setContentsMargins(14, 12, 14, 12)
             key = QLabel(left)
@@ -126,7 +126,7 @@ class ContactInfoDialog(QDialog):
                 background-color: {self.colors['bg_secondary']};
                 color: {self.colors['text_primary']};
                 border: none;
-                border-radius: 16px;
+                border-radius: 999px;
                 padding: 14px;
                 font-weight: 600;
             }}

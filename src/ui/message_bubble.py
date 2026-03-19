@@ -4,21 +4,13 @@ from __future__ import annotations
 
 import os
 
-from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QCursor, QPixmap
-from PyQt6.QtWidgets import (
-    QFrame,
-    QGraphicsOpacityEffect,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QCursor, QPainter, QPainterPath, QPixmap
+from PyQt6.QtWidgets import QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from src.database.messages_db import QUICK_REACTIONS
 from src.models.message import Message, MessageStatus, MessageType
-from src.styles import FONT_FAMILY, RADIUS_MESSAGE
+from src.styles import FONT_FAMILY
 from src.styles.themes import get_theme_colors
 
 
@@ -51,7 +43,7 @@ class MessageBubble(QWidget):
         self.setStyleSheet("background: transparent;")
         self.root = QVBoxLayout(self)
         self.root.setContentsMargins(0, 0, 0, 0)
-        self.root.setSpacing(4)
+        self.root.setSpacing(6)
 
         self.row = QHBoxLayout()
         self.row.setContentsMargins(0, 0, 0, 0)
@@ -74,7 +66,7 @@ class MessageBubble(QWidget):
         self.root.addLayout(self.row)
 
         self.content_layout = QVBoxLayout(self.card)
-        self.content_layout.setContentsMargins(14, 10, 14, 10)
+        self.content_layout.setContentsMargins(16, 12, 16, 12)
         self.content_layout.setSpacing(8)
 
         self.forwarded_label = QLabel()
@@ -85,7 +77,6 @@ class MessageBubble(QWidget):
         self.photo_label.setMinimumSize(240, 140)
         self.photo_label.setMaximumSize(360, 260)
         self.photo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.photo_label.setScaledContents(False)
         self.photo_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self.photo_label.clicked.connect(lambda: self.photo_requested.emit(self.message.id))
         self.photo_label.hide()
@@ -111,11 +102,7 @@ class MessageBubble(QWidget):
         self.reactions_row.setContentsMargins(0, 0, 0, 0)
         self.reactions_row.setSpacing(6)
         self.reactions_wrap.hide()
-        self.root.addWidget(
-            self.reactions_wrap,
-            0,
-            Qt.AlignmentFlag.AlignRight if self.is_own else Qt.AlignmentFlag.AlignLeft,
-        )
+        self.root.addWidget(self.reactions_wrap, 0, Qt.AlignmentFlag.AlignRight if self.is_own else Qt.AlignmentFlag.AlignLeft)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -125,8 +112,8 @@ class MessageBubble(QWidget):
     def refresh(self):
         self.colors = get_theme_colors()
         bg = self.colors["message_own_bg"] if self.is_own else self.colors["message_other_bg"]
-        text = "#FFFFFF" if self.is_own else self.colors["text_primary"]
-        meta = "#FFFFFF" if self.is_own else self.colors["text_tertiary"]
+        text = "#171717" if self.is_own else self.colors["text_primary"]
+        meta = "#55565C" if self.is_own else self.colors["text_tertiary"]
         if self.is_own and self.message.status == MessageStatus.READ:
             meta = self.colors["read_check"]
         elif self.is_own and self.message.status == MessageStatus.DELIVERED:
@@ -137,30 +124,23 @@ class MessageBubble(QWidget):
             f"""
             QFrame {{
                 background-color: {bg};
-                border-radius: {RADIUS_MESSAGE}px;
+                border-radius: 34px;
                 border: 1px solid {outline};
             }}
             """
         )
-        self.content_label.setStyleSheet(
-            f"color: {text}; font-size: 15px; font-family: {FONT_FAMILY}; background: transparent;"
-        )
-        self.meta_label.setStyleSheet(
-            f"color: {meta}; font-size: 11px; font-family: {FONT_FAMILY}; background: transparent;"
-        )
-        self.forwarded_label.setStyleSheet(
-            f"color: {meta}; font-size: 11px; font-family: {FONT_FAMILY}; background: transparent;"
-        )
+        self.content_label.setStyleSheet(f"color: {text}; font-size: 15px; font-family: {FONT_FAMILY}; background: transparent;")
+        self.meta_label.setStyleSheet(f"color: {meta}; font-size: 11px; font-family: {FONT_FAMILY}; background: transparent;")
+        self.forwarded_label.setStyleSheet(f"color: {meta}; font-size: 11px; font-family: {FONT_FAMILY}; background: transparent;")
         self.poll_label.setStyleSheet(
-            f"color: {text}; font-size: 13px; font-family: {FONT_FAMILY}; "
-            "background-color: rgba(255,255,255,0.06); border-radius: 12px; padding: 8px 10px;"
+            f"color: {text}; font-size: 13px; font-family: {FONT_FAMILY}; background-color: rgba(255,255,255,0.04); border-radius: 22px; padding: 10px 12px;"
         )
         self.selection_badge.setStyleSheet(
             f"""
             QLabel {{
                 background-color: {self.colors['accent_primary'] if self.message.is_selected else self.colors['bg_tertiary']};
                 color: white;
-                border-radius: 12px;
+                border-radius: 999px;
                 font-size: 13px;
                 font-weight: 700;
             }}
@@ -192,25 +172,38 @@ class MessageBubble(QWidget):
         self.photo_label.setVisible(should_show)
         if not should_show:
             return
+
         source = self.message.file_url
         if source and os.path.exists(source):
             pixmap = QPixmap(source)
             if not pixmap.isNull():
-                self.photo_label.setStyleSheet("background: transparent; border-radius: 16px;")
-                self.photo_label.setText("")
-                self.photo_label.setPixmap(
-                    pixmap.scaled(
-                        QSize(320, 220),
-                        Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
+                scaled = pixmap.scaled(
+                    QSize(320, 220),
+                    Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                    Qt.TransformationMode.SmoothTransformation,
                 )
+                self.photo_label.setStyleSheet("background: transparent;")
+                self.photo_label.setText("")
+                self.photo_label.setPixmap(self._rounded_pixmap(scaled, 28))
                 return
+
         self.photo_label.setText("Открыть медиа")
         self.photo_label.setPixmap(QPixmap())
         self.photo_label.setStyleSheet(
-            f"background-color: rgba(255,255,255,0.06); color: {self.colors['text_primary']}; border-radius: 16px;"
+            f"background-color: rgba(255,255,255,0.06); color: {self.colors['text_primary']}; border-radius: 28px;"
         )
+
+    def _rounded_pixmap(self, pixmap: QPixmap, radius: int) -> QPixmap:
+        rounded = QPixmap(pixmap.size())
+        rounded.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(rounded)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(rounded.rect()), radius, radius)
+        painter.setClipPath(path)
+        painter.drawPixmap(0, 0, pixmap)
+        painter.end()
+        return rounded
 
     def _refresh_poll(self):
         if self.message.message_type != MessageType.POLL:
@@ -240,16 +233,16 @@ class MessageBubble(QWidget):
             button.setStyleSheet(
                 f"""
                 QPushButton {{
-                    background-color: {'rgba(47, 128, 237, 0.18)' if active else self.colors['bg_tertiary']};
+                    background-color: {'rgba(94, 92, 230, 0.18)' if active else '#242424'};
                     color: {self.colors['text_primary']};
                     border: none;
-                    border-radius: 12px;
-                    padding: 2px 8px;
+                    border-radius: 999px;
+                    padding: 3px 10px;
                     font-size: 11px;
                 }}
                 """
             )
-            button.setFixedHeight(22)
+            button.setFixedHeight(24)
             button.clicked.connect(lambda _, value=emoji: self.reaction_clicked.emit(self.message.id, value))
             self.reactions_row.addWidget(button)
         self.reactions_wrap.setVisible(visible)

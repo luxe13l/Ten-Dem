@@ -1,4 +1,4 @@
-"""Settings dialog with real state saving."""
+"""Settings dialog with darker layered styling."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QFrame,
-    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -26,6 +25,7 @@ from src.database.local_store import load_store, save_store
 from src.database.users_db import update_user
 from src.styles import FONT_FAMILY, RADIUS_BUTTON, RADIUS_CARD
 from src.styles.themes import apply_theme, get_theme_colors
+from src.ui.auto_hide_scrollbar import AutoHideScrollBar
 
 DEFAULT_SHORTCUTS = {
     "send": "Ctrl+Return",
@@ -71,16 +71,22 @@ class SettingsWindow(QDialog):
         self.resize(820, 640)
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setStyleSheet("background: transparent;")
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(20, 20, 20, 20)
 
         card = QFrame()
-        card.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-radius: 24px; }}")
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(50)
-        shadow.setOffset(0, 12)
-        card.setGraphicsEffect(shadow)
+        card.setObjectName("settingsCard")
+        card.setStyleSheet(
+            """
+            QFrame#settingsCard {
+                background-color: #0E1115;
+                border: 1px solid #181C21;
+                border-radius: 34px;
+            }
+            """
+        )
         outer.addWidget(card)
 
         layout = QVBoxLayout(card)
@@ -92,15 +98,15 @@ class SettingsWindow(QDialog):
 
     def _create_header(self):
         frame = QFrame()
-        frame.setStyleSheet(
-            f"QFrame {{ background-color: {self.colors['bg_tertiary']}; border-radius: 24px 24px 0 0; }}"
-        )
+        frame.setStyleSheet("QFrame { background-color: #14181D; border-radius: 34px 34px 0 0; }")
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setContentsMargins(26, 22, 26, 22)
+
         title = QLabel("Настройки")
         title.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 22px; font-weight: 600;")
         layout.addWidget(title)
         layout.addStretch()
+
         close_btn = QPushButton("✕")
         close_btn.setFixedSize(38, 38)
         close_btn.setStyleSheet(self._icon_style())
@@ -110,8 +116,18 @@ class SettingsWindow(QDialog):
 
     def _create_content(self):
         scroll = QScrollArea()
+        scroll.setVerticalScrollBar(AutoHideScrollBar(parent=scroll))
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        scroll.setStyleSheet(
+            """
+            QScrollArea { border: none; background: transparent; }
+            QScrollBar:vertical { width: 8px; background: transparent; margin: 10px 4px 10px 0; }
+            QScrollBar::handle:vertical { background: rgba(255,255,255,0.18); border-radius: 4px; min-height: 34px; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; background: transparent; border: none; }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+            """
+        )
+
         container = QWidget()
         container.setStyleSheet("background: transparent;")
         layout = QVBoxLayout(container)
@@ -127,6 +143,7 @@ class SettingsWindow(QDialog):
 
     def _profile_section(self):
         section, layout = self._section("Профиль")
+
         row = QHBoxLayout()
         avatar = QLabel((self.current_user.name or "?")[0].upper())
         avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -135,6 +152,7 @@ class SettingsWindow(QDialog):
             f"QLabel {{ background-color: {self.colors['accent_primary']}; color: white; border-radius: 36px; font-size: 28px; font-weight: 700; }}"
         )
         row.addWidget(avatar)
+
         text_layout = QVBoxLayout()
         name_label = QLabel(self.current_user.name or "Пользователь")
         name_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 18px; font-weight: 600;")
@@ -151,7 +169,10 @@ class SettingsWindow(QDialog):
             self.settings.get("username", getattr(self.current_user, "username", "")),
             "@username",
         )
-        self.form_controls["bio"] = self._line_edit(self.settings.get("bio", getattr(self.current_user, "bio", "")), "О себе")
+        self.form_controls["bio"] = self._line_edit(
+            self.settings.get("bio", getattr(self.current_user, "bio", "")),
+            "О себе",
+        )
         layout.addWidget(self.form_controls["name"])
         layout.addWidget(self.form_controls["username"])
         layout.addWidget(self.form_controls["bio"])
@@ -159,11 +180,13 @@ class SettingsWindow(QDialog):
 
     def _appearance_section(self):
         section, layout = self._section("Оформление")
+
         row = QHBoxLayout()
         label = QLabel("Тема")
         label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 14px;")
         row.addWidget(label)
         row.addStretch()
+
         combo = QComboBox()
         combo.addItems(["Тёмная", "Светлая", "Системная"])
         combo.setCurrentText({"dark": "Тёмная", "light": "Светлая", "system": "Системная"}.get(self.settings.get("theme", "dark"), "Тёмная"))
@@ -175,10 +198,18 @@ class SettingsWindow(QDialog):
         slider_label = QLabel("Размер текста")
         slider_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 14px;")
         layout.addWidget(slider_label)
+
         slider = QSlider(Qt.Orientation.Horizontal)
         slider.setMinimum(12)
         slider.setMaximum(20)
         slider.setValue(int(self.settings.get("font_scale", 15)))
+        slider.setStyleSheet(
+            """
+            QSlider::groove:horizontal { height: 6px; background: #232830; border-radius: 3px; }
+            QSlider::handle:horizontal { width: 16px; margin: -5px 0; border-radius: 8px; background: #5F6D7C; }
+            QSlider::sub-page:horizontal { background: #5F6D7C; border-radius: 3px; }
+            """
+        )
         self.form_controls["font_scale"] = slider
         layout.addWidget(slider)
         return section
@@ -196,7 +227,7 @@ class SettingsWindow(QDialog):
             box.setStyleSheet(
                 f"""
                 QCheckBox {{ color: {self.colors['text_primary']}; font-size: 14px; spacing: 10px; }}
-                QCheckBox::indicator {{ width: 18px; height: 18px; border-radius: 5px; border: 1px solid {self.colors['divider']}; }}
+                QCheckBox::indicator {{ width: 18px; height: 18px; border-radius: 6px; border: 1px solid {self.colors['divider']}; background: #10151B; }}
                 QCheckBox::indicator:checked {{ background-color: {self.colors['accent_primary']}; border-color: {self.colors['accent_primary']}; }}
                 """
             )
@@ -206,7 +237,11 @@ class SettingsWindow(QDialog):
 
     def _privacy_section(self):
         section, layout = self._section("Конфиденциальность")
-        for left, right in [("Кто видит онлайн", "Все"), ("Кто может писать", "Все"), ("Кто может звонить", "Контакты")]:
+        for left, right in [
+            ("Кто видит онлайн", "Все"),
+            ("Кто может писать", "Все"),
+            ("Кто может звонить", "Контакты"),
+        ]:
             row = QHBoxLayout()
             left_label = QLabel(left)
             left_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 14px;")
@@ -220,17 +255,17 @@ class SettingsWindow(QDialog):
 
     def _create_footer(self):
         frame = QFrame()
-        frame.setStyleSheet(
-            f"QFrame {{ background-color: {self.colors['bg_tertiary']}; border-radius: 0 0 24px 24px; }}"
-        )
+        frame.setStyleSheet("QFrame { background-color: #14181D; border-radius: 0 0 34px 34px; }")
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(24, 18, 24, 18)
         layout.addStretch()
+
         cancel = QPushButton("Отмена")
         cancel.setFixedSize(120, 44)
         cancel.setStyleSheet(self._secondary_button_style())
         cancel.clicked.connect(self.reject)
         layout.addWidget(cancel)
+
         save = QPushButton("Сохранить")
         save.setFixedSize(140, 44)
         save.setStyleSheet(self._primary_button_style())
@@ -262,10 +297,12 @@ class SettingsWindow(QDialog):
         store = load_store()
         store.setdefault("settings", {})[self.current_user.uid] = payload
         save_store(store)
+
         self.current_user.name = payload["name"]
         self.current_user.username = payload["username"]
         self.current_user.bio = payload["bio"]
         self.current_user.theme = payload["theme"]
+
         update_user(
             self.current_user.uid,
             {
@@ -281,7 +318,15 @@ class SettingsWindow(QDialog):
 
     def _section(self, title: str):
         section = QFrame()
-        section.setStyleSheet(f"QFrame {{ background-color: {self.colors['bg_tertiary']}; border-radius: {RADIUS_CARD}px; }}")
+        section.setStyleSheet(
+            f"""
+            QFrame {{
+                background-color: #171C22;
+                border: none;
+                border-radius: {RADIUS_CARD + 6}px;
+            }}
+            """
+        )
         layout = QVBoxLayout(section)
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(14)
@@ -299,21 +344,51 @@ class SettingsWindow(QDialog):
     def _input_style(self):
         return f"""
         QLineEdit, QComboBox {{
-            background-color: {self.colors['bg_primary']};
+            background-color: #10151B;
             color: {self.colors['text_primary']};
             border: none;
-            border-radius: {RADIUS_BUTTON}px;
-            padding: 12px 14px;
+            border-radius: {RADIUS_BUTTON + 4}px;
+            padding: 13px 15px;
             font-size: 14px;
             font-family: {FONT_FAMILY};
+        }}
+        QComboBox::drop-down {{
+            border: none;
+            width: 24px;
+            background: transparent;
         }}
         """
 
     def _primary_button_style(self):
-        return f"QPushButton {{ background-color: {self.colors['accent_primary']}; color: white; border: none; border-radius: {RADIUS_BUTTON}px; font-size: 14px; font-weight: 600; }}"
+        return f"""
+        QPushButton {{
+            background-color: {self.colors['accent_primary']};
+            color: white;
+            border: none;
+            border-radius: {RADIUS_BUTTON + 6}px;
+            font-size: 14px;
+            font-weight: 600;
+        }}
+        QPushButton:hover {{
+            background-color: {self.colors['accent_hover']};
+        }}
+        """
 
     def _secondary_button_style(self):
-        return f"QPushButton {{ background-color: transparent; color: {self.colors['text_secondary']}; border: none; border-radius: {RADIUS_BUTTON}px; font-size: 14px; font-weight: 500; }}"
+        return f"""
+        QPushButton {{
+            background-color: transparent;
+            color: {self.colors['text_secondary']};
+            border: none;
+            border-radius: {RADIUS_BUTTON + 6}px;
+            font-size: 14px;
+            font-weight: 500;
+        }}
+        QPushButton:hover {{
+            background-color: #1A1F26;
+            color: {self.colors['text_primary']};
+        }}
+        """
 
     def _icon_style(self):
         return f"""
@@ -321,11 +396,11 @@ class SettingsWindow(QDialog):
             background-color: transparent;
             color: {self.colors['text_secondary']};
             border: none;
-            border-radius: 12px;
+            border-radius: 16px;
             font-size: 16px;
         }}
         QPushButton:hover {{
-            background-color: {self.colors['bg_primary']};
+            background-color: #1A1F26;
             color: {self.colors['text_primary']};
         }}
         """

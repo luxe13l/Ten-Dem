@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QStyle,
     QVBoxLayout,
     QWidget,
 )
@@ -26,6 +27,7 @@ from src.database.users_db import create_user, get_all_users, set_online_status
 from src.models.user import User
 from src.styles import FONT_FAMILY, LEFT_PANEL_WIDTH, WINDOW_MIN_HEIGHT, WINDOW_MIN_WIDTH
 from src.styles.themes import get_theme_colors
+from src.ui.auto_hide_scrollbar import AutoHideScrollBar
 from src.ui.chat_creation_dialogs import CreateContactDialog, CreateGroupDialog
 from src.ui.chat_widget import ChatWidget
 from src.ui.contact_info_dialog import ContactInfoDialog
@@ -55,29 +57,41 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"Ten Dem | {self.current_user.name}")
         self.setMinimumSize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
         self.resize(1280, 820)
-        self.setStyleSheet(f"background-color: {self.colors['bg_primary']};")
+        self.setStyleSheet(f"QMainWindow {{ background-color: {self.colors['bg_primary']}; }}")
 
         central = QWidget()
+        central.setObjectName("mainSurface")
+        central.setStyleSheet(f"#mainSurface {{ background-color: {self.colors['bg_primary']}; }}")
         self.setCentralWidget(central)
+
         layout = QHBoxLayout(central)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(14)
         layout.addWidget(self._create_sidebar())
         layout.addWidget(self._create_right_panel(), 1)
 
     def _create_sidebar(self):
         panel = QWidget()
         panel.setFixedWidth(LEFT_PANEL_WIDTH)
-        panel.setStyleSheet(f"QWidget {{ background-color: {self.colors['bg_secondary']}; }}")
+        panel.setObjectName("sidebarPanel")
+        panel.setStyleSheet(
+            f"""
+            QWidget#sidebarPanel {{
+                background-color: {self.colors['bg_secondary']};
+                border-radius: 28px;
+            }}
+            """
+        )
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
         header = QHBoxLayout()
-        header.setContentsMargins(20, 20, 20, 16)
+        header.setContentsMargins(22, 22, 22, 18)
+
         title = QLabel("Ten Dem")
         title.setFont(QFont(FONT_FAMILY, 20, QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {self.colors['text_primary']}; background: transparent;")
+        title.setStyleSheet(f"color: {self.colors['text_primary']};")
         header.addWidget(title)
         header.addStretch()
 
@@ -85,16 +99,8 @@ class MainWindow(QMainWindow):
         settings_btn.setFixedSize(40, 40)
         settings_btn.setIcon(QIcon("assets/icons/settings.svg"))
         settings_btn.setIconSize(QSize(18, 18))
-        settings_btn.setStyleSheet(
-            f"""
-            QPushButton {{
-                background-color: transparent;
-                border: none;
-                border-radius: 12px;
-            }}
-            QPushButton:hover {{ background-color: {self.colors['bg_tertiary']}; }}
-            """
-        )
+        settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        settings_btn.setStyleSheet(self._icon_button_style())
         settings_btn.clicked.connect(self.open_settings)
         header.addWidget(settings_btn)
         layout.addLayout(header)
@@ -105,10 +111,10 @@ class MainWindow(QMainWindow):
         self.search_input.setStyleSheet(
             f"""
             QLineEdit {{
-                margin: 0 16px 16px 16px;
-                padding: 12px 16px;
+                margin: 0 16px 18px 16px;
+                padding: 14px 18px;
                 border: none;
-                border-radius: 18px;
+                border-radius: 26px;
                 background-color: {self.colors['bg_tertiary']};
                 color: {self.colors['text_primary']};
                 font-size: 14px;
@@ -118,6 +124,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.search_input)
 
         self.contacts_list = QListWidget()
+        self.contacts_list.setVerticalScrollBar(AutoHideScrollBar(parent=self.contacts_list))
         self.contacts_list.itemClicked.connect(self.open_chat)
         self.contacts_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.contacts_list.customContextMenuRequested.connect(self.open_contact_menu)
@@ -131,31 +138,57 @@ class MainWindow(QMainWindow):
             }}
             QListWidget::item {{
                 margin: 0 0 8px 0;
-                border-radius: 18px;
+                border-radius: 20px;
                 background: transparent;
             }}
-            QListWidget::item:selected {{ background-color: transparent; }}
-            QListWidget::item:hover {{ background-color: transparent; }}
+            QListWidget::item:selected {{
+                background-color: transparent;
+            }}
+            QListWidget::item:hover {{
+                background-color: transparent;
+            }}
+            QScrollBar:vertical {{
+                width: 10px;
+                background: transparent;
+                margin: 10px 6px 76px 0;
+            }}
+            QScrollBar::handle:vertical {{
+                background: rgba(255,255,255,0.18);
+                border-radius: 999px;
+                min-height: 42px;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+                background: transparent;
+                border: none;
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: transparent;
+            }}
             """
         )
         layout.addWidget(self.contacts_list, 1)
 
         bottom = QHBoxLayout()
-        bottom.setContentsMargins(18, 0, 18, 24)
+        bottom.setContentsMargins(18, 0, 18, 30)
         bottom.addStretch()
+
         self.new_chat_button = QPushButton("+")
         self.new_chat_button.setFixedSize(54, 54)
+        self.new_chat_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.new_chat_button.setStyleSheet(
             f"""
             QPushButton {{
                 background-color: {self.colors['accent_primary']};
                 color: white;
                 border: none;
-                border-radius: 27px;
+                border-radius: 999px;
                 font-size: 28px;
                 font-weight: 500;
             }}
-            QPushButton:hover {{ background-color: {self.colors['accent_hover']}; }}
+            QPushButton:hover {{
+                background-color: {self.colors['accent_hover']};
+            }}
             """
         )
         self.new_chat_button.clicked.connect(self.open_create_menu)
@@ -165,22 +198,35 @@ class MainWindow(QMainWindow):
 
     def _create_right_panel(self):
         self.right_panel = QWidget()
-        self.right_panel.setStyleSheet(f"background-color: {self.colors['bg_primary']};")
+        self.right_panel.setObjectName("chatPanel")
+        self.right_panel.setStyleSheet(
+            f"""
+            QWidget#chatPanel {{
+                background-color: {self.colors['bg_secondary']};
+                border-radius: 30px;
+            }}
+            """
+        )
         right_layout = QVBoxLayout(self.right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        self.placeholder = QWidget()
-        placeholder_layout = QVBoxLayout(self.placeholder)
-        placeholder_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        text = QLabel("Выберите чат, чтобы начать общение")
-        text.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 18px; background: transparent;")
-        placeholder_layout.addWidget(text)
+        self.placeholder = self._build_placeholder()
         right_layout.addWidget(self.placeholder)
         return self.right_panel
+
+    def _build_placeholder(self):
+        placeholder = QWidget()
+        layout = QVBoxLayout(placeholder)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label = QLabel("Выберите чат, чтобы начать общение")
+        label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 18px;")
+        layout.addWidget(label)
+        return placeholder
 
     def _bind_shortcuts(self):
         for shortcut in self._shortcuts:
             shortcut.deleteLater()
         self._shortcuts = []
+
         bindings = {
             "search": self.focus_search,
             "new_chat": self.open_create_menu,
@@ -198,11 +244,19 @@ class MainWindow(QMainWindow):
         self.search_input.setFocus()
         self.search_input.selectAll()
 
+    def _std_icon(self, name: str):
+        pixmap = getattr(QStyle.StandardPixmap, name, None)
+        if pixmap is None:
+            return QIcon()
+        return self.style().standardIcon(pixmap)
+
     def open_create_menu(self):
         menu = QMenu(self)
         menu.setStyleSheet(self._menu_style())
         contact_action = menu.addAction("Создать контакт")
         group_action = menu.addAction("Создать группу")
+        contact_action.setIcon(self._std_icon("SP_FileIcon"))
+        group_action.setIcon(self._std_icon("SP_FileDialogNewFolder"))
         anchor = self.new_chat_button.mapToGlobal(self.new_chat_button.rect().topLeft())
         action = menu.exec(anchor)
         if action == contact_action:
@@ -270,12 +324,7 @@ class MainWindow(QMainWindow):
         if self.current_chat_widget:
             self.current_chat_widget.deleteLater()
             self.current_chat_widget = None
-            self.placeholder = QWidget()
-            placeholder_layout = QVBoxLayout(self.placeholder)
-            placeholder_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            text = QLabel("Выберите чат, чтобы начать общение")
-            text.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 18px; background: transparent;")
-            placeholder_layout.addWidget(text)
+            self.placeholder = self._build_placeholder()
             self.right_panel.layout().addWidget(self.placeholder)
 
     def open_settings(self):
@@ -306,6 +355,7 @@ class MainWindow(QMainWindow):
         pinned = set(store.get("pinned_chats", {}).get(self.current_user.uid, []))
         archived = set(store.get("archived_chats", {}).get(self.current_user.uid, []))
         deleted = set(store.get("deleted_chats", {}).get(self.current_user.uid, []))
+
         all_users = get_all_users()
         visible_users = [
             user
@@ -319,6 +369,7 @@ class MainWindow(QMainWindow):
                 (user.get("name") or "").lower(),
             )
         )
+
         for user_data in visible_users:
             user = User.from_dict(user_data, user_data.get("uid"))
             summary = summaries.get(user.uid, {})
@@ -377,17 +428,26 @@ class MainWindow(QMainWindow):
         widget = self.contacts_list.itemWidget(item)
         if not widget:
             return
+
         menu = QMenu(self)
         menu.setStyleSheet(self._menu_style())
-        info_action = menu.addAction("Информация о контакте")
+        info_action = menu.addAction("Информация")
         open_action = menu.addAction("Открыть чат")
+        info_action.setIcon(self._std_icon("SP_MessageBoxInformation"))
+        open_action.setIcon(self._std_icon("SP_DialogOpenButton"))
+
         store = load_store()
         pinned = set(store.get("pinned_chats", {}).get(self.current_user.uid, []))
         archived = set(store.get("archived_chats", {}).get(self.current_user.uid, []))
+
         pin_action = menu.addAction("Открепить чат" if widget.user.uid in pinned else "Закрепить чат")
         archive_action = menu.addAction("Вернуть из архива" if widget.user.uid in archived else "Архивировать чат")
         delete_action = menu.addAction("Удалить чат")
+        pin_action.setIcon(QIcon("assets/icons/attach.svg"))
+        archive_action.setIcon(self._std_icon("SP_DialogSaveButton"))
+        delete_action.setIcon(self._std_icon("SP_TrashIcon"))
         action = menu.exec(self.contacts_list.mapToGlobal(pos))
+
         if action == open_action:
             self.open_chat(item)
         elif action == info_action:
@@ -435,18 +495,32 @@ class MainWindow(QMainWindow):
             self.handle_escape()
         self.load_contacts()
 
+    def _icon_button_style(self):
+        return f"""
+        QPushButton {{
+            background-color: transparent;
+            color: {self.colors['icon_default']};
+            border: none;
+            border-radius: 999px;
+        }}
+        QPushButton:hover {{
+            background-color: {self.colors['bg_tertiary']};
+            color: {self.colors['text_primary']};
+        }}
+        """
+
     def _menu_style(self):
         return f"""
         QMenu {{
             background-color: {self.colors['bg_secondary']};
             color: {self.colors['text_primary']};
             border: none;
-            border-radius: 14px;
+            border-radius: 20px;
             padding: 8px;
         }}
         QMenu::item {{
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: 10px 16px;
+            border-radius: 14px;
         }}
         QMenu::item:selected {{
             background-color: {self.colors['bg_tertiary']};

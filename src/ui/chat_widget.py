@@ -6,20 +6,7 @@ import os
 
 from PyQt6.QtCore import QEvent, QMimeData, QSize, QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QKeyEvent, QKeySequence, QShortcut
-from PyQt6.QtWidgets import (
-    QFileDialog,
-    QFrame,
-    QHBoxLayout,
-    QLabel,
-    QMenu,
-    QMessageBox,
-    QProgressDialog,
-    QPushButton,
-    QScrollArea,
-    QTextEdit,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QLabel, QMenu, QMessageBox, QProgressDialog, QPushButton, QScrollArea, QStyle, QTextEdit, QVBoxLayout, QWidget
 
 from src.database.messages_db import (
     QUICK_REACTIONS,
@@ -36,6 +23,7 @@ from src.models.message import Message, MessageStatus, MessageType
 from src.styles import FONT_FAMILY
 from src.styles.themes import get_theme_colors
 from src.ui.attachment_preview_dialog import AttachmentPreviewDialog
+from src.ui.auto_hide_scrollbar import AutoHideScrollBar
 from src.ui.chat_action_dialogs import DeleteMessageDialog, EditMessageDialog, ForwardMessagesDialog
 from src.ui.message_bubble import MessageBubble
 from src.ui.photo_viewer_dialog import PhotoViewerDialog
@@ -103,14 +91,17 @@ class ChatWidget(QWidget):
         root.addWidget(self.reply_bar)
 
         self.messages_scroll = QScrollArea()
+        self.messages_scroll.setVerticalScrollBar(AutoHideScrollBar(parent=self.messages_scroll))
         self.messages_scroll.setWidgetResizable(True)
         self.messages_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.messages_scroll.setStyleSheet(
             f"""
-            QScrollArea {{ border: none; background: {self.colors['bg_primary']}; }}
-            QScrollBar:vertical {{ width: 8px; background: transparent; margin: 4px; }}
-            QScrollBar::handle:vertical {{ background: rgba(255,255,255,0.0); border-radius: 4px; }}
+            QScrollArea {{ border: none; background: {self.colors['bg_secondary']}; border-radius: 28px; }}
+            QScrollBar:vertical {{ width: 10px; background: transparent; margin: 8px 6px 8px 0; }}
+            QScrollBar::handle:vertical {{ background: rgba(255,255,255,0.18); border-radius: 999px; min-height: 42px; }}
             QScrollBar::handle:vertical:hover {{ background: rgba(255,255,255,0.22); }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; background: transparent; border: none; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
             """
         )
 
@@ -131,11 +122,17 @@ class ChatWidget(QWidget):
         root.addWidget(self.messages_scroll, 1)
         root.addWidget(self._create_input_panel())
 
+    def _std_icon(self, name: str):
+        pixmap = getattr(QStyle.StandardPixmap, name, None)
+        if pixmap is None:
+            return QIcon()
+        return self.style().standardIcon(pixmap)
+
     def _create_header(self):
         frame = QFrame()
-        frame.setFixedHeight(72)
+        frame.setFixedHeight(78)
         frame.setStyleSheet(
-            f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-bottom: 1px solid {self.colors['divider']}; }}"
+            f"QFrame {{ background-color: rgba(22, 22, 22, 0.96); border: none; border-radius: 28px 28px 0 0; }}"
         )
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(20, 0, 20, 0)
@@ -177,6 +174,8 @@ class ChatWidget(QWidget):
         select_action.triggered.connect(self.enter_selection_mode)
         clear_action = menu.addAction("Очистить историю")
         clear_action.triggered.connect(self.clear_history)
+        select_action.setIcon(self._std_icon("SP_DialogApplyButton"))
+        clear_action.setIcon(self._std_icon("SP_TrashIcon"))
         menu_button.setMenu(menu)
         layout.addWidget(menu_button)
         return frame
@@ -237,20 +236,20 @@ class ChatWidget(QWidget):
                 background-color: {self.colors['bg_tertiary']};
                 color: {self.colors['text_primary']};
                 border: none;
-                border-radius: 20px;
-                padding: 10px 14px;
+                border-radius: 26px;
+                padding: 12px 16px;
                 font-size: 15px;
                 font-family: {FONT_FAMILY};
             }}
             QScrollBar:vertical {{
                 background: transparent;
-                width: 8px;
-                margin: 8px 4px 8px 0;
+                width: 10px;
+                margin: 8px 6px 8px 0;
             }}
             QScrollBar::handle:vertical {{
-                background: rgba(255,255,255,0.0);
+                background: rgba(255,255,255,0.18);
                 min-height: 28px;
-                border-radius: 4px;
+                border-radius: 999px;
             }}
             QScrollBar::handle:vertical:hover {{
                 background: rgba(255,255,255,0.22);
@@ -281,7 +280,7 @@ class ChatWidget(QWidget):
                 background-color: {self.colors['accent_primary']};
                 color: white;
                 border: none;
-                border-radius: 21px;
+                border-radius: 999px;
             }}
             QPushButton:hover {{ background-color: {self.colors['accent_hover']}; }}
             QPushButton:disabled {{
@@ -402,6 +401,9 @@ class ChatWidget(QWidget):
         pin_action = menu.addAction("Закрепить")
         react_menu = menu.addMenu("Реакции")
         react_menu.setStyleSheet(self._menu_style())
+        reply_action.setIcon(self._std_icon("SP_ArrowBack"))
+        pin_action.setIcon(QIcon(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets", "icons", "attach.svg")))
+        react_menu.setIcon(self._std_icon("SP_DialogApplyButton"))
         for emoji in QUICK_REACTIONS:
             action = react_menu.addAction(emoji)
             action.triggered.connect(lambda _, value=emoji, msg_id=message.id: self.apply_reaction(msg_id, value))
@@ -410,6 +412,11 @@ class ChatWidget(QWidget):
         forward_action = menu.addAction("Переслать")
         edit_action = menu.addAction("Изменить") if message.from_uid == self.current_user.uid else None
         delete_action = menu.addAction("Удалить")
+        select_action.setIcon(self._std_icon("SP_DialogApplyButton"))
+        forward_action.setIcon(self._std_icon("SP_ArrowForward"))
+        if edit_action:
+            edit_action.setIcon(self._std_icon("SP_FileDialogContentsView"))
+        delete_action.setIcon(self._std_icon("SP_TrashIcon"))
 
         action = menu.exec(bubble.mapToGlobal(pos))
         if action == reply_action:
@@ -597,6 +604,10 @@ class ChatWidget(QWidget):
         video_action = menu.addAction("Видео")
         poll_action = menu.addAction("Опрос")
         file_action = menu.addAction("Файл")
+        photo_action.setIcon(self._std_icon("SP_FileIcon"))
+        video_action.setIcon(self._std_icon("SP_MediaPlay"))
+        poll_action.setIcon(self._std_icon("SP_DialogApplyButton"))
+        file_action.setIcon(self._std_icon("SP_FileLinkIcon"))
         action = menu.exec(self.attach_btn.mapToGlobal(self.attach_btn.rect().bottomLeft()))
         if action == photo_action:
             self.attach_photo()
@@ -710,12 +721,12 @@ class ChatWidget(QWidget):
             background-color: {self.colors['bg_secondary']};
             color: {self.colors['text_primary']};
             border: none;
-            border-radius: 14px;
+            border-radius: 18px;
             padding: 8px;
         }}
         QMenu::item {{
-            padding: 8px 14px;
-            border-radius: 8px;
+            padding: 10px 16px;
+            border-radius: 14px;
         }}
         QMenu::item:selected {{
             background-color: {self.colors['bg_tertiary']};
@@ -728,10 +739,10 @@ class ChatWidget(QWidget):
             background-color: {self.colors['bg_tertiary']};
             color: {self.colors['icon_default']};
             border: none;
-            border-radius: 21px;
+            border-radius: 999px;
         }}
         QPushButton:hover {{
-            background-color: {self.colors['divider']};
+            background-color: #272727;
             color: {self.colors['text_primary']};
         }}
         """
