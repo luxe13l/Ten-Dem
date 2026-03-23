@@ -1,49 +1,45 @@
 """Message bubble widget."""
-
 from __future__ import annotations
-
 import os
-
-from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QPoint, QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QCursor, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
-
 from src.database.messages_db import QUICK_REACTIONS
 from src.models.message import Message, MessageStatus, MessageType
 from src.styles import FONT_FAMILY
 from src.styles.themes import get_theme_colors
 
-
 class ClickableLabel(QLabel):
     clicked = pyqtSignal()
-
+    
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
         super().mousePressEvent(event)
 
-
 class MessageBubble(QWidget):
     clicked = pyqtSignal(str)
     photo_requested = pyqtSignal(str)
     reaction_clicked = pyqtSignal(str, str)
-
-    def __init__(self, message: Message, is_own: bool, current_user_uid: str = "", parent=None):
+    context_menu_requested = pyqtSignal(QPoint)
+    
+    def __init__(self, message: Message, is_own: bool, current_user_uid: str = "", theme_name: str = "dark", parent=None):
         super().__init__(parent)
         self.message = message
         self.is_own = is_own
         self.current_user_uid = current_user_uid
-        self.colors = get_theme_colors()
+        self.theme_name = theme_name or "dark"
+        self.colors = get_theme_colors(self.theme_name)
         self._animation: QPropertyAnimation | None = None
         self.build_ui()
         self.refresh()
         self.play_appear_animation()
-
+ 
     def build_ui(self):
         self.setStyleSheet("background: transparent;")
         self.root = QVBoxLayout(self)
         self.root.setContentsMargins(0, 0, 0, 0)
-        self.root.setSpacing(6)
+        self.root.setSpacing(0)
 
         self.row = QHBoxLayout()
         self.row.setContentsMargins(0, 0, 0, 0)
@@ -51,11 +47,27 @@ class MessageBubble(QWidget):
         if self.is_own:
             self.row.addStretch()
 
+        # Контейнер для сообщения + реакции
+        self.bubble_container = QWidget()
+        self.bubble_container.setStyleSheet("background: transparent;")
+        self.bubble_layout = QVBoxLayout(self.bubble_container)
+        self.bubble_layout.setContentsMargins(0, 0, 0, 0)
+        self.bubble_layout.setSpacing(0)
+
         self.card = QFrame()
         self.card.setMaximumWidth(560)
         self.card.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.row.addWidget(self.card)
+        self.card.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.card.customContextMenuRequested.connect(lambda pos: self._forward_context_menu(self.card, pos))
+        
+        # ← КЛЮЧЕВОЕ: card_layout внутри card
+        self.card_layout = QVBoxLayout(self.card)
+        self.card_layout.setContentsMargins(0, 0, 0, 0)
+        self.card_layout.setSpacing(0)
+        
+        self.bubble_layout.addWidget(self.card)
+        self.row.addWidget(self.bubble_container)
         if not self.is_own:
             self.row.addStretch()
 
@@ -65,12 +77,16 @@ class MessageBubble(QWidget):
         self.row.addWidget(self.selection_badge, 0, Qt.AlignmentFlag.AlignBottom)
         self.root.addLayout(self.row)
 
-        self.content_layout = QVBoxLayout(self.card)
+        # Контент сообщения
+        self.content_layout = QVBoxLayout()
         self.content_layout.setContentsMargins(16, 12, 16, 12)
         self.content_layout.setSpacing(8)
+        self.card_layout.addLayout(self.content_layout)
 
         self.forwarded_label = QLabel()
         self.forwarded_label.hide()
+        self.forwarded_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.forwarded_label.customContextMenuRequested.connect(lambda pos: self._forward_context_menu(self.forwarded_label, pos))
         self.content_layout.addWidget(self.forwarded_label)
 
         self.photo_label = ClickableLabel()
@@ -79,58 +95,78 @@ class MessageBubble(QWidget):
         self.photo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.photo_label.setCursor(Qt.CursorShape.PointingHandCursor)
         self.photo_label.clicked.connect(lambda: self.photo_requested.emit(self.message.id))
+        self.photo_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.photo_label.customContextMenuRequested.connect(lambda pos: self._forward_context_menu(self.photo_label, pos))
         self.photo_label.hide()
         self.content_layout.addWidget(self.photo_label)
 
         self.content_label = QLabel()
         self.content_label.setWordWrap(True)
         self.content_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.content_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.content_label.customContextMenuRequested.connect(lambda pos: self._forward_context_menu(self.content_label, pos))
         self.content_layout.addWidget(self.content_label)
 
         self.poll_label = QLabel()
         self.poll_label.setWordWrap(True)
         self.poll_label.hide()
+        self.poll_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.poll_label.customContextMenuRequested.connect(lambda pos: self._forward_context_menu(self.poll_label, pos))
         self.content_layout.addWidget(self.poll_label)
 
         self.meta_label = QLabel()
         self.meta_label.setAlignment(Qt.AlignmentFlag.AlignRight if self.is_own else Qt.AlignmentFlag.AlignLeft)
+        self.meta_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.meta_label.customContextMenuRequested.connect(lambda pos: self._forward_context_menu(self.meta_label, pos))
         self.content_layout.addWidget(self.meta_label)
 
+        # ← КЛЮЧЕВОЕ: Реакции ВНУТРИ card_layout (внутри карточки)
         self.reactions_wrap = QWidget()
         self.reactions_wrap.setStyleSheet("background: transparent;")
         self.reactions_row = QHBoxLayout(self.reactions_wrap)
-        self.reactions_row.setContentsMargins(0, 0, 0, 0)
-        self.reactions_row.setSpacing(6)
+        self.reactions_row.setContentsMargins(8, 4, 8, 8)
+        self.reactions_row.setSpacing(4)
         self.reactions_wrap.hide()
-        self.root.addWidget(self.reactions_wrap, 0, Qt.AlignmentFlag.AlignRight if self.is_own else Qt.AlignmentFlag.AlignLeft)
+        self.card_layout.addWidget(self.reactions_wrap, 0, Qt.AlignmentFlag.AlignRight)  # ← ВНУТРИ card_layout!
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self.message.id)
         super().mousePressEvent(event)
 
+    def _forward_context_menu(self, widget: QWidget, pos: QPoint):
+        global_pos = widget.mapToGlobal(pos)
+        local_pos = self.mapFromGlobal(global_pos)
+        self.context_menu_requested.emit(local_pos)
+
     def refresh(self):
-        self.colors = get_theme_colors()
+        self.colors = get_theme_colors(self.theme_name)
+        
+        # ЦВЕТА СООБЩЕНИЙ — тёмно-серые
         bg = self.colors["message_own_bg"] if self.is_own else self.colors["message_other_bg"]
-        text = "#171717" if self.is_own else self.colors["text_primary"]
-        meta = "#55565C" if self.is_own else self.colors["text_tertiary"]
+        text = self.colors.get("message_own_text", "#FFFFFF") if self.is_own else self.colors.get("message_other_text", self.colors["text_primary"])
+        meta = self.colors.get("message_meta_own", "#8B8B90") if self.is_own else self.colors["text_tertiary"]
+        
         if self.is_own and self.message.status == MessageStatus.READ:
-            meta = self.colors["read_check"]
+            meta_color = self.colors.get("read_check", "#57B58A")
         elif self.is_own and self.message.status == MessageStatus.DELIVERED:
-            meta = self.colors["delivered_check"]
+            meta_color = self.colors.get("delivered_check", "#8A8A92")
+        else:
+            meta_color = meta
 
         outline = self.colors["accent_primary"] if self.message.is_selected else "transparent"
+        
         self.card.setStyleSheet(
             f"""
             QFrame {{
                 background-color: {bg};
-                border-radius: 34px;
+                border-radius: 22px;
                 border: 1px solid {outline};
             }}
             """
         )
         self.content_label.setStyleSheet(f"color: {text}; font-size: 15px; font-family: {FONT_FAMILY}; background: transparent;")
-        self.meta_label.setStyleSheet(f"color: {meta}; font-size: 11px; font-family: {FONT_FAMILY}; background: transparent;")
+        self.meta_label.setStyleSheet(f"color: {meta_color}; font-size: 11px; font-family: {FONT_FAMILY}; background: transparent;")
         self.forwarded_label.setStyleSheet(f"color: {meta}; font-size: 11px; font-family: {FONT_FAMILY}; background: transparent;")
         self.poll_label.setStyleSheet(
             f"color: {text}; font-size: 13px; font-family: {FONT_FAMILY}; background-color: rgba(255,255,255,0.04); border-radius: 22px; padding: 10px 12px;"
@@ -190,7 +226,7 @@ class MessageBubble(QWidget):
         self.photo_label.setText("Открыть медиа")
         self.photo_label.setPixmap(QPixmap())
         self.photo_label.setStyleSheet(
-            f"background-color: rgba(255,255,255,0.06); color: {self.colors['text_primary']}; border-radius: 28px;"
+            f"background-color: {self.colors.get('message_media_placeholder_bg', 'rgba(255,255,255,0.06)')}; color: {self.colors['text_primary']}; border-radius: 28px;"
         )
 
     def _rounded_pixmap(self, pixmap: QPixmap, radius: int) -> QPixmap:
@@ -221,30 +257,52 @@ class MessageBubble(QWidget):
                 widget.deleteLater()
 
         reactions = self.message.reactions or {}
+        
+        # Группируем: один юзер = одна реакция
+        user_reactions = {}
+        for emoji, users in reactions.items():
+            for user_uid in users:
+                if user_uid not in user_reactions:
+                    user_reactions[user_uid] = emoji
+        
+        # Считаем по эмодзи
+        grouped = {}
+        for user_uid, emoji in user_reactions.items():
+            if emoji not in grouped:
+                grouped[emoji] = []
+            grouped[emoji].append(user_uid)
+
         visible = False
-        for emoji in QUICK_REACTIONS:
-            users = reactions.get(emoji, [])
+        for emoji, users in grouped.items():
             if not users:
                 continue
             visible = True
+            
+            user_has_reaction = self.current_user_uid in users
+            
+            # ПОЛНОСТЬЮ ЗАКРУГЛЁННАЯ КАПСУЛА — ПОЧТИ ПРОЗРАЧНАЯ С СЕРЫМ ОТТЕНКОМ
             button = QPushButton(f"{emoji} {len(users)}")
             button.setCursor(Qt.CursorShape.PointingHandCursor)
-            active = self.current_user_uid in users
             button.setStyleSheet(
                 f"""
                 QPushButton {{
-                    background-color: {'rgba(94, 92, 230, 0.18)' if active else '#242424'};
+                    background-color: {'rgba(50, 50, 50, 0.5)' if user_has_reaction else 'rgba(40, 40, 40, 0.35)'};
                     color: {self.colors['text_primary']};
-                    border: none;
+                    border: 1px solid {'rgba(80, 80, 80, 0.5)' if user_has_reaction else 'rgba(60, 60, 60, 0.3)'};
                     border-radius: 999px;
-                    padding: 3px 10px;
+                    padding: 3px 8px;
                     font-size: 11px;
+                    font-weight: 500;
+                }}
+                QPushButton:hover {{
+                    background-color: {'rgba(60, 60, 60, 0.6)' if user_has_reaction else 'rgba(50, 50, 50, 0.45)'};
                 }}
                 """
             )
             button.setFixedHeight(24)
             button.clicked.connect(lambda _, value=emoji: self.reaction_clicked.emit(self.message.id, value))
             self.reactions_row.addWidget(button)
+        
         self.reactions_wrap.setVisible(visible)
 
     def play_appear_animation(self):

@@ -1,4 +1,4 @@
-"""Registration wizard with real validation."""
+﻿"""Registration wizard with real validation."""
 
 from __future__ import annotations
 

@@ -11,6 +11,7 @@ load_dotenv()
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 from src.database.firebase_client import init_firebase
 from src.database.yandex_storage import init_yandex_storage
@@ -22,6 +23,7 @@ from src.ui.main_window import MainWindow
 
 
 main_window_ref = None
+APP_ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Логотип Ten Dem.png")
 
 
 def main():
@@ -41,11 +43,15 @@ def main():
         print("3. Создание QApplication...")
         app = QApplication(sys.argv)
         app.setApplicationName("Ten Dem")
+        if os.path.exists(APP_ICON_PATH):
+            app.setWindowIcon(QIcon(APP_ICON_PATH))
         app.setStyle("Fusion")
         apply_theme(app, "dark")
         
         print("4. Создание окна регистрации...")
         wizard = RegistrationWizard()
+        if os.path.exists(APP_ICON_PATH):
+            wizard.setWindowIcon(QIcon(APP_ICON_PATH))
         wizard.registration_complete.connect(lambda data: on_registration_complete(data, wizard, app))
         
         print("5. Показ окна регистрации...")
@@ -103,6 +109,8 @@ def on_registration_complete(data, wizard, app):
     
     print("7. Создание главного окна мессенджера...")
     main_window_ref = MainWindow(current_user)
+    if os.path.exists(APP_ICON_PATH):
+        main_window_ref.setWindowIcon(QIcon(APP_ICON_PATH))
     
     print("8. Показ главного окна...")
     main_window_ref.show()

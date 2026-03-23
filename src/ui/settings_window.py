@@ -1,7 +1,5 @@
-"""Settings dialog with darker layered styling."""
-
+"""Settings dialog with theme-aware styling."""
 from __future__ import annotations
-
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
@@ -19,7 +17,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from src.database.auth_manager import auth_manager
 from src.database.local_store import load_store, save_store
 from src.database.users_db import update_user
@@ -34,14 +31,14 @@ DEFAULT_SHORTCUTS = {
     "escape": "Esc",
 }
 
-
 class SettingsWindow(QDialog):
     settings_saved = pyqtSignal(dict)
-
+    
     def __init__(self, current_user, parent=None):
         super().__init__(parent)
         self.current_user = current_user
         self.colors = get_theme_colors(getattr(self.current_user, "theme", "dark"))
+        self.is_light = getattr(self.current_user, "theme", "dark") == "light"
         self.form_controls = {}
         self.settings = self._load_settings()
         self.init_ui()
@@ -65,6 +62,9 @@ class SettingsWindow(QDialog):
         merged["shortcuts"] = {**DEFAULT_SHORTCUTS, **data.get("shortcuts", {})}
         return merged
 
+    def _tone(self, dark_value: str, light_value: str) -> str:
+        return light_value if self.is_light else dark_value
+
     def init_ui(self):
         self.setWindowTitle("Настройки")
         self.setModal(True)
@@ -79,12 +79,12 @@ class SettingsWindow(QDialog):
         card = QFrame()
         card.setObjectName("settingsCard")
         card.setStyleSheet(
-            """
-            QFrame#settingsCard {
-                background-color: #0E1115;
-                border: 1px solid #181C21;
+            f"""
+            QFrame#settingsCard {{
+                background-color: {self._tone('#0E1115', '#FFFFFF')};
+                border: 1px solid {self._tone('#181C21', '#E3E6EB')};
                 border-radius: 34px;
-            }
+            }}
             """
         )
         outer.addWidget(card)
@@ -98,7 +98,9 @@ class SettingsWindow(QDialog):
 
     def _create_header(self):
         frame = QFrame()
-        frame.setStyleSheet("QFrame { background-color: #14181D; border-radius: 34px 34px 0 0; }")
+        frame.setStyleSheet(
+            f"QFrame {{ background-color: {self._tone('#14181D', '#F4F6F9')}; border-radius: 34px 34px 0 0; }}"
+        )
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(26, 22, 26, 22)
 
@@ -119,12 +121,12 @@ class SettingsWindow(QDialog):
         scroll.setVerticalScrollBar(AutoHideScrollBar(parent=scroll))
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet(
-            """
-            QScrollArea { border: none; background: transparent; }
-            QScrollBar:vertical { width: 8px; background: transparent; margin: 10px 4px 10px 0; }
-            QScrollBar::handle:vertical { background: rgba(255,255,255,0.18); border-radius: 4px; min-height: 34px; }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; background: transparent; border: none; }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+            f"""
+            QScrollArea {{ border: none; background: transparent; }}
+            QScrollBar:vertical {{ width: 8px; background: transparent; margin: 10px 4px 10px 0; }}
+            QScrollBar::handle:vertical {{ background: {self._tone('rgba(255,255,255,0.18)', 'rgba(19,32,44,0.18)')}; border-radius: 999px; min-height: 34px; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; background: transparent; border: none; }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
             """
         )
 
@@ -199,15 +201,17 @@ class SettingsWindow(QDialog):
         slider_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 14px;")
         layout.addWidget(slider_label)
 
+        groove = self._tone("#232830", "#D9E0E7")
+        handle = self._tone("#5F6D7C", "#6E8FB2")
         slider = QSlider(Qt.Orientation.Horizontal)
         slider.setMinimum(12)
         slider.setMaximum(20)
         slider.setValue(int(self.settings.get("font_scale", 15)))
         slider.setStyleSheet(
-            """
-            QSlider::groove:horizontal { height: 6px; background: #232830; border-radius: 3px; }
-            QSlider::handle:horizontal { width: 16px; margin: -5px 0; border-radius: 8px; background: #5F6D7C; }
-            QSlider::sub-page:horizontal { background: #5F6D7C; border-radius: 3px; }
+            f"""
+            QSlider::groove:horizontal {{ height: 6px; background: {groove}; border-radius: 3px; }}
+            QSlider::handle:horizontal {{ width: 16px; margin: -5px 0; border-radius: 8px; background: {handle}; }}
+            QSlider::sub-page:horizontal {{ background: {handle}; border-radius: 3px; }}
             """
         )
         self.form_controls["font_scale"] = slider
@@ -216,6 +220,7 @@ class SettingsWindow(QDialog):
 
     def _notifications_section(self):
         section, layout = self._section("Уведомления")
+        indicator_bg = self._tone("#10151B", "#F0F3F6")
         for key, title in [
             ("sound", "Звук сообщений"),
             ("push", "Push-уведомления"),
@@ -227,7 +232,7 @@ class SettingsWindow(QDialog):
             box.setStyleSheet(
                 f"""
                 QCheckBox {{ color: {self.colors['text_primary']}; font-size: 14px; spacing: 10px; }}
-                QCheckBox::indicator {{ width: 18px; height: 18px; border-radius: 6px; border: 1px solid {self.colors['divider']}; background: #10151B; }}
+                QCheckBox::indicator {{ width: 18px; height: 18px; border-radius: 6px; border: 1px solid {self.colors['divider']}; background: {indicator_bg}; }}
                 QCheckBox::indicator:checked {{ background-color: {self.colors['accent_primary']}; border-color: {self.colors['accent_primary']}; }}
                 """
             )
@@ -255,7 +260,10 @@ class SettingsWindow(QDialog):
 
     def _create_footer(self):
         frame = QFrame()
-        frame.setStyleSheet("QFrame { background-color: #14181D; border-radius: 0 0 34px 34px; }")
+        # ИСПРАВЛЕНО: нижние углы теперь закруглены
+        frame.setStyleSheet(
+            f"QFrame {{ background-color: {self._tone('#14181D', '#F4F6F9')}; border-radius: 0 0 34px 34px; }}"
+        )
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(24, 18, 24, 18)
         layout.addStretch()
@@ -321,8 +329,8 @@ class SettingsWindow(QDialog):
         section.setStyleSheet(
             f"""
             QFrame {{
-                background-color: #171C22;
-                border: none;
+                background-color: {self._tone('#171C22', '#F7F8FA')};
+                border: 1px solid {self._tone('transparent', '#E7EAEE')};
                 border-radius: {RADIUS_CARD + 6}px;
             }}
             """
@@ -342,11 +350,13 @@ class SettingsWindow(QDialog):
         return field
 
     def _input_style(self):
+        bg = self._tone("#10151B", "#FFFFFF")
+        border = self._tone("transparent", "#E3E7EC")
         return f"""
         QLineEdit, QComboBox {{
-            background-color: #10151B;
+            background-color: {bg};
             color: {self.colors['text_primary']};
-            border: none;
+            border: 1px solid {border};
             border-radius: {RADIUS_BUTTON + 4}px;
             padding: 13px 15px;
             font-size: 14px;
@@ -363,7 +373,7 @@ class SettingsWindow(QDialog):
         return f"""
         QPushButton {{
             background-color: {self.colors['accent_primary']};
-            color: white;
+            color: {'white' if not self.is_light else '#FFFFFF'};
             border: none;
             border-radius: {RADIUS_BUTTON + 6}px;
             font-size: 14px;
@@ -375,6 +385,7 @@ class SettingsWindow(QDialog):
         """
 
     def _secondary_button_style(self):
+        hover_bg = self._tone("#1A1F26", "#EEF2F6")
         return f"""
         QPushButton {{
             background-color: transparent;
@@ -385,12 +396,13 @@ class SettingsWindow(QDialog):
             font-weight: 500;
         }}
         QPushButton:hover {{
-            background-color: #1A1F26;
+            background-color: {hover_bg};
             color: {self.colors['text_primary']};
         }}
         """
 
     def _icon_style(self):
+        hover_bg = self._tone("#1A1F26", "#EEF2F6")
         return f"""
         QPushButton {{
             background-color: transparent;
@@ -400,7 +412,7 @@ class SettingsWindow(QDialog):
             font-size: 16px;
         }}
         QPushButton:hover {{
-            background-color: #1A1F26;
+            background-color: {hover_bg};
             color: {self.colors['text_primary']};
         }}
         """
