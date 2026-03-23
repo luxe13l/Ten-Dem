@@ -7,10 +7,10 @@
       "username": "",
       "bio": "",
       "theme": "system",
-      "status": "offline",
+      "status": "online",
       "last_seen": {
         "__type__": "datetime",
-        "value": "2026-03-22T22:18:44.396266"
+        "value": "2026-03-23T14:08:16.607133"
       }
     },
     "user-e95d23f5e58c": {
@@ -124,6 +124,17 @@
         "__type__": "datetime",
         "value": "2026-03-22T20:53:52.988242"
       }
+    },
+    "user-62d22cbd3665": {
+      "uid": "user-62d22cbd3665",
+      "name": "марсель",
+      "phone": "+79191468868",
+      "username": "",
+      "status": "offline",
+      "avatar_url": "",
+      "bio": "",
+      "theme": "dark",
+      "is_group": false
     }
   },
   "messages": [
@@ -1090,7 +1101,11 @@
       "edited_at": null,
       "deleted_for": [],
       "disappears_at": null,
-      "reactions": {},
+      "reactions": {
+        "😂": [
+          "test_user"
+        ]
+      },
       "poll_options": []
     },
     {
@@ -1198,6 +1213,987 @@
       "timestamp": {
         "__type__": "datetime",
         "value": "2026-03-22T22:18:42.892622"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "34b1c78e-b59f-412d-87dd-5a66b0e7f04b",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "аввв",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:06:27.715808"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "6c21a494-9bcb-4b74-9bf2-c4cd619b1234",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "АИАААААААААААААААААААА",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:06:27.718067"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "05f79240-0545-47ab-9d74-65d0bfc478a8",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "А",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:06:27.736024"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {
+        "❤️": [
+          "test_user"
+        ]
+      },
+      "poll_options": []
+    },
+    {
+      "id": "4d1026e0-95fe-4742-a8c3-52d1d93c9484",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "А",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:06:27.743966"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "4262b624-a49a-402a-9768-010677f8b3c3",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "АААА",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:06:27.751936"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "e7f35079-132d-490e-a649-6464090b7bab",
+      "from_uid": "test_user",
+      "to_uid": "user-e95d23f5e58c",
+      "text": "аввв",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:06:40.570547"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "913715fb-df0f-4e74-ae79-da86a4f3dbe5",
+      "from_uid": "test_user",
+      "to_uid": "user-e95d23f5e58c",
+      "text": "АИАААААААААААААААААААА",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:06:40.572833"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "370c9c35-228b-4fe0-b1e2-884ddcc9a883",
+      "from_uid": "test_user",
+      "to_uid": "user-e95d23f5e58c",
+      "text": "А",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:06:40.581887"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "14b797af-c2ce-4d25-b55d-36a89777c841",
+      "from_uid": "test_user",
+      "to_uid": "user-e95d23f5e58c",
+      "text": "А",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:06:40.591077"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "3451811c-9cb4-4c5f-9f00-c7389db63ee6",
+      "from_uid": "test_user",
+      "to_uid": "user-e95d23f5e58c",
+      "text": "Ауууууууууууууууууууууу",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:06:40.600784"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": true,
+      "edited_at": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:10:44.371535"
+      },
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "c61264fd-f6eb-4817-8e34-50a67eba11cc",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "авав",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:09:50.981217"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "6c21a494-9bcb-4b74-9bf2-c4cd619b1234",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "b589df4f-ebd1-40a1-82e8-56eab1b74c4b",
+      "from_uid": "test_user",
+      "to_uid": "group-fdbc520ba720",
+      "text": "А",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:10:03.213698"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "6e152464-885d-4dc3-a31a-c8972c7761fd",
+      "from_uid": "test_user",
+      "to_uid": "group-fdbc520ba720",
+      "text": "А",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:10:03.216048"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "20d96c0c-e37d-499b-8446-3ce3d3abbb5f",
+      "from_uid": "test_user",
+      "to_uid": "group-fdbc520ba720",
+      "text": "авав",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:10:03.226631"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "test_user",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "bb6063b5-a3c0-493d-882f-27b2bf5ca79b",
+      "from_uid": "test_user",
+      "to_uid": "group-fdbc520ba720",
+      "text": "вававававававававава",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:21:27.653452"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "beb78b45-8fab-4d19-9714-713337dda5df",
+      "from_uid": "test_user",
+      "to_uid": "group-fdbc520ba720",
+      "text": "аауауа",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:21:41.291443"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "d803159b-ad56-4b39-8db5-e2cdae6fd11b",
+      "from_uid": "test_user",
+      "to_uid": "group-fdbc520ba720",
+      "text": "ааауаууауа",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:21:56.671947"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "fda7b4b2-2dd3-495f-b052-36f2374e078c",
+      "from_uid": "test_user",
+      "to_uid": "group-fdbc520ba720",
+      "text": "ааааааааааааааааааааааааааааа",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:21:56.799349"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": true,
+      "edited_at": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:29:12.706312"
+      },
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "8f57ac41-e0f7-4e86-a629-7fdf96b5f3f5",
+      "from_uid": "test_user",
+      "to_uid": "group-fdbc520ba720",
+      "text": "а",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:21:56.931390"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "074abd13-ca7a-46c9-9c1e-fd8b4eec07fe",
+      "from_uid": "test_user",
+      "to_uid": "group-fdbc520ba720",
+      "text": "ушауокорорк34олк4о3к4",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:21:57.045370"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": true,
+      "edited_at": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:29:25.354583"
+      },
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "a0d81e14-42ab-4743-8c81-088593b8e3ee",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "ап",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:32:31.535852"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "a67d3a17-8a28-408a-8e89-537eb5922ce1",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "п",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:32:31.658085"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "631964db-59e9-47a1-b4c4-dfaa95d3526f",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "п",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:32:31.770119"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "df3a216a-e326-4b63-9f44-d2ceaf8b3f05",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "п",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:32:31.985890"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "b868bb6e-32d7-4242-88f6-3fb7fa044411",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "п",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:32:32.120204"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "bb2d56f0-f600-438d-ad5b-3abf6172c6e2",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "а",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:32:35.161704"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "567d21fe-1206-4390-885e-993ade632d2b",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "а",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:32:50.459083"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "daf7e3eb-00fc-428b-ac6b-86f21e0d59ee",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "па",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:45:51.882756"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "d151d2d3-3303-4bd7-8e6a-fe841cefa8c6",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "а",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:45:52.028505"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "0a3ef3f2-d2c2-4bdd-b65f-5e600a269ca2",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "па",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:45:52.156521"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "627fa49a-e02a-4c62-919b-291313f21f68",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "а",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:45:52.300268"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "17a2ee62-60dc-4792-a288-a85aa22be1da",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "а",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:45:52.438372"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "3b26e024-5551-4c96-b4d6-51dba1acf6fa",
+      "from_uid": "test_user",
+      "to_uid": "user-0b026f2af1cc",
+      "text": "а",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:45:52.560483"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [
+        "test_user"
+      ],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "2e2e3b6e-324a-43fd-af2d-b924956f9a5c",
+      "from_uid": "test_user",
+      "to_uid": "group-69fb72081dd0",
+      "text": "а",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T13:46:11.572302"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "8e9a0b94-b8e5-4ab0-a702-8738e34efbcc",
+      "from_uid": "test_user",
+      "to_uid": "user-62d22cbd3665",
+      "text": "ап",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T14:18:23.425478"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "863e4390-14e1-4abb-a831-b41097f8cf72",
+      "from_uid": "test_user",
+      "to_uid": "user-62d22cbd3665",
+      "text": "п",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T14:18:23.563746"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "b552629f-f553-4aea-9665-914829a39606",
+      "from_uid": "test_user",
+      "to_uid": "user-62d22cbd3665",
+      "text": "п",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T14:18:23.699357"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "a152d7da-dce2-4b6b-bc2b-bde6ac32fafa",
+      "from_uid": "test_user",
+      "to_uid": "user-62d22cbd3665",
+      "text": "п",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T14:18:23.821394"
+      },
+      "status": "sent",
+      "file_url": "",
+      "file_name": "",
+      "file_size": 0,
+      "duration": 0,
+      "reply_to_id": "",
+      "forwarded_from_uid": "",
+      "is_edited": false,
+      "edited_at": null,
+      "deleted_for": [],
+      "disappears_at": null,
+      "reactions": {},
+      "poll_options": []
+    },
+    {
+      "id": "3aa4b744-afdf-4d61-b739-842b56b2a1bd",
+      "from_uid": "test_user",
+      "to_uid": "user-62d22cbd3665",
+      "text": "пп",
+      "message_type": "text",
+      "timestamp": {
+        "__type__": "datetime",
+        "value": "2026-03-23T14:18:25.361421"
       },
       "status": "sent",
       "file_url": "",
@@ -1325,10 +2321,14 @@
   "deleted_chats": {
     "test_user": [
       "group-26e5741e25dd",
+      "group-69fb72081dd0",
+      "group-fdbc520ba720",
       "nHNiX1q9Ws5Zom4vHNtU",
       "test_user_20260318_175528",
+      "user-0b026f2af1cc",
       "user-1100b998a2cb",
-      "user-8f2073f3a8ad"
+      "user-8f2073f3a8ad",
+      "user-e95d23f5e58c"
     ]
   },
   "muted_chats": {

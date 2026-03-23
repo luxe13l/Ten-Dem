@@ -10,11 +10,13 @@ from src.styles import FONT_FAMILY
 from src.styles.themes import get_theme_colors
 
 class ClickableLabel(QLabel):
+    """Лейбл, который эмитит сигнал при клике."""
     clicked = pyqtSignal()
     
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
+        # Важно: вызываем базовый метод, чтобы текст всё ещё можно было выделять мышкой, если нужно
         super().mousePressEvent(event)
 
 class MessageBubble(QWidget):
@@ -61,7 +63,7 @@ class MessageBubble(QWidget):
         self.card.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.card.customContextMenuRequested.connect(lambda pos: self._forward_context_menu(self.card, pos))
         
-        # ← КЛЮЧЕВОЕ: card_layout внутри card
+        # Контейнер для контента сообщения + реакции внутри
         self.card_layout = QVBoxLayout(self.card)
         self.card_layout.setContentsMargins(0, 0, 0, 0)
         self.card_layout.setSpacing(0)
@@ -100,11 +102,14 @@ class MessageBubble(QWidget):
         self.photo_label.hide()
         self.content_layout.addWidget(self.photo_label)
 
-        self.content_label = QLabel()
+        # ✅ ИСПРАВЛЕНИЕ: Используем ClickableLabel для текста и подключаем сигнал
+        self.content_label = ClickableLabel()
         self.content_label.setWordWrap(True)
         self.content_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.content_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.content_label.customContextMenuRequested.connect(lambda pos: self._forward_context_menu(self.content_label, pos))
+        # Теперь клик по тексту тоже вызывает общий клик пузыря
+        self.content_label.clicked.connect(lambda: self.clicked.emit(self.message.id))
         self.content_layout.addWidget(self.content_label)
 
         self.poll_label = QLabel()
@@ -120,16 +125,17 @@ class MessageBubble(QWidget):
         self.meta_label.customContextMenuRequested.connect(lambda pos: self._forward_context_menu(self.meta_label, pos))
         self.content_layout.addWidget(self.meta_label)
 
-        # ← КЛЮЧЕВОЕ: Реакции ВНУТРИ card_layout (внутри карточки)
+        # Реакции — ВНУТРИ карточки сообщения (в правом нижнем углу)
         self.reactions_wrap = QWidget()
         self.reactions_wrap.setStyleSheet("background: transparent;")
         self.reactions_row = QHBoxLayout(self.reactions_wrap)
         self.reactions_row.setContentsMargins(8, 4, 8, 8)
         self.reactions_row.setSpacing(4)
         self.reactions_wrap.hide()
-        self.card_layout.addWidget(self.reactions_wrap, 0, Qt.AlignmentFlag.AlignRight)  # ← ВНУТРИ card_layout!
+        self.card_layout.addWidget(self.reactions_wrap, 0, Qt.AlignmentFlag.AlignRight)
 
     def mousePressEvent(self, event):
+        # Клик по пустому месту внутри пузыря тоже выбирает сообщение
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self.message.id)
         super().mousePressEvent(event)
@@ -154,14 +160,16 @@ class MessageBubble(QWidget):
         else:
             meta_color = meta
 
-        outline = self.colors["accent_primary"] if self.message.is_selected else "transparent"
+        # ✅ УБРАЛИ ОБВОДКУ. Вместо неё меняем фон при выделении.
+        if self.message.is_selected:
+            bg = self.colors["bg_tertiary"] 
         
         self.card.setStyleSheet(
             f"""
             QFrame {{
                 background-color: {bg};
                 border-radius: 22px;
-                border: 1px solid {outline};
+                border: none;
             }}
             """
         )
@@ -171,18 +179,9 @@ class MessageBubble(QWidget):
         self.poll_label.setStyleSheet(
             f"color: {text}; font-size: 13px; font-family: {FONT_FAMILY}; background-color: rgba(255,255,255,0.04); border-radius: 22px; padding: 10px 12px;"
         )
-        self.selection_badge.setStyleSheet(
-            f"""
-            QLabel {{
-                background-color: {self.colors['accent_primary'] if self.message.is_selected else self.colors['bg_tertiary']};
-                color: white;
-                border-radius: 999px;
-                font-size: 13px;
-                font-weight: 700;
-            }}
-            """
-        )
-        self.selection_badge.setVisible(self.message.selection_enabled)
+        
+        # Скрываем бейджик выделения, так как теперь используем изменение фона
+        self.selection_badge.setVisible(False) 
 
         self.forwarded_label.setVisible(bool(self.message.forwarded_from_uid))
         if self.message.forwarded_from_uid:

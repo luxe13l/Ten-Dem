@@ -177,6 +177,7 @@ class ChatWidget(QWidget):
         return frame
 
     def _create_selection_bar(self):
+        """Панель действий при выборе сообщений (Переслать / Удалить)"""
         self.selection_bar = QFrame()
         self.selection_bar.hide()
         self.selection_bar.setStyleSheet(
@@ -184,17 +185,27 @@ class ChatWidget(QWidget):
         )
         layout = QHBoxLayout(self.selection_bar)
         layout.setContentsMargins(16, 10, 16, 10)
+        
         self.selection_label = QLabel("Выбрано: 0")
         self.selection_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-size: 13px; font-weight: 600; background: transparent;")
         layout.addWidget(self.selection_label)
         layout.addStretch()
 
+        # Кнопка ПЕРЕСЛАТЬ
         forward_btn = QPushButton("Переслать")
         forward_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         forward_btn.setStyleSheet(self._ghost_button_style(primary=True))
         forward_btn.clicked.connect(self.forward_selected_messages)
         layout.addWidget(forward_btn)
 
+        # Кнопка УДАЛИТЬ
+        delete_btn = QPushButton("Удалить")
+        delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        delete_btn.setStyleSheet(self._ghost_button_style(primary=False))
+        delete_btn.clicked.connect(self.delete_selected_messages)
+        layout.addWidget(delete_btn)
+
+        # ❌ КНОПКУ "НАЗАД" УБРАЛИ — она не нужна
         cancel_btn = QPushButton("Отмена")
         cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         cancel_btn.setStyleSheet(self._ghost_button_style())
@@ -445,7 +456,9 @@ class ChatWidget(QWidget):
         elif edit_action and action == edit_action:
             self.edit_message(message)
         elif action == delete_action:
-            self.request_delete_message(message)
+            # Для одиночного удаления через меню
+            self.selected_message_ids = {message.id}
+            self.delete_selected_messages()
 
     def on_send_clicked(self):
         text = self.input_field.toPlainText().strip()
@@ -484,7 +497,6 @@ class ChatWidget(QWidget):
         self._add_message_widget(message)
         self.input_field.clear()
         self.clear_reply()
-        # ✅ АВТО-СКРОЛЛ К НОВОМУ СООБЩЕНИЮ
         QTimer.singleShot(50, self.scroll_to_bottom)
         self.chat_updated.emit(self.contact.uid)
 
@@ -529,8 +541,9 @@ class ChatWidget(QWidget):
         self.chat_updated.emit(self.contact.uid)
 
     def request_delete_message(self, message: Message):
+        # ✅ ВСЕГДА ПОКАЗЫВАЕМ ДИАЛОГ С ВЫБОРОМ "У МЕНЯ" / "У ВСЕХ"
         dialog = DeleteMessageDialog(
-            allow_for_everyone=message.from_uid == self.current_user.uid,
+            allow_for_everyone=True, 
             theme_name=getattr(self.current_user, "theme", "dark"),
             parent=self,
         )
@@ -550,6 +563,49 @@ class ChatWidget(QWidget):
         self.empty_state.setVisible(not self.messages)
         self._refresh_selection_widgets()
         self.chat_updated.emit(self.contact.uid)
+
+    # ============================================================
+    # МАССОВОЕ УДАЛЕНИЕ ВЫДЕЛЕННЫХ СООБЩЕНИЙ
+    # ============================================================
+    def delete_selected_messages(self):
+        if not self.selected_message_ids:
+            QMessageBox.information(self, "Удаление", "Сначала выберите сообщения.")
+            return
+
+        # ✅ МЫ ВСЕГДА ПОКАЗЫВАЕМ ВЫБОР "У МЕНЯ" / "У ВСЕХ"
+        # Не важно, свои сообщения или чужие. Пользователь сам решает.
+        
+        dialog = DeleteMessageDialog(
+            allow_for_everyone=True,  # Всегда разрешаем выбор
+            theme_name=getattr(self.current_user, "theme", "dark"),
+            parent=self,
+        )
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        
+        for_everyone = (dialog.result_mode == "all")
+        
+        # Удаляем циклом
+        ids_to_remove = list(self.selected_message_ids)
+        for msg_id in ids_to_remove:
+            message = self._find_message(msg_id)
+            if message:
+                # Вызываем функцию удаления из БД
+                # База данных сама решит, что можно удалить физически, а что пометить
+                delete_message_record(message.id, for_everyone=for_everyone, deleted_by=self.current_user.uid)
+                
+                # Удаляем из UI
+                bubble = self.message_widgets.pop(message.id, None)
+                if bubble:
+                    bubble.deleteLater()
+                self.messages = [m for m in self.messages if m.id != message.id]
+        
+        # Очищаем выделение
+        self.selected_message_ids.clear()
+        self.exit_selection_mode()
+        self.empty_state.setVisible(not self.messages)
+        self.chat_updated.emit(self.contact.uid)
+    # ============================================================
 
     def apply_reaction(self, message_id: str, emoji: str):
         reactions = toggle_reaction(message_id, emoji, self.current_user.uid)

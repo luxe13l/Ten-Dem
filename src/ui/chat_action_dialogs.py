@@ -1,7 +1,5 @@
 """Dialogs used by chat actions."""
-
 from __future__ import annotations
-
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog,
@@ -13,9 +11,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-
 from src.styles.themes import get_theme_colors
-
 
 class ForwardMessagesDialog(QDialog):
     def __init__(self, users: list[dict], theme_name: str = "dark", parent=None):
@@ -63,7 +59,7 @@ class ForwardMessagesDialog(QDialog):
             """
         )
         for user in self.users:
-            item = QListWidgetItem(f"{user.get('name', 'Пользователь')}  @{user.get('username', '')}".strip())
+            item = QListWidgetItem(f"{user.get('name', 'Пользователь')} @{user.get('username', '')}".strip())
             item.setData(Qt.ItemDataRole.UserRole, user.get("uid"))
             self.list_widget.addItem(item)
         self.list_widget.itemDoubleClicked.connect(lambda _: self.accept_selection())
@@ -102,11 +98,13 @@ class ForwardMessagesDialog(QDialog):
         self.selected_uid = item.data(Qt.ItemDataRole.UserRole)
         self.accept()
 
-
 class DeleteMessageDialog(QDialog):
-    def __init__(self, allow_for_everyone: bool, theme_name: str = "dark", parent=None):
+    def __init__(self, allow_for_everyone: bool = True, theme_name: str = "dark", parent=None):
+        """
+        allow_for_everyone теперь игнорируется при построении UI.
+        Кнопки 'У меня' и 'У всех' показываются ВСЕГДА.
+        """
         super().__init__(parent)
-        self.allow_for_everyone = allow_for_everyone
         self.theme_name = theme_name or "dark"
         self.colors = get_theme_colors(self.theme_name)
         self.result_mode = ""
@@ -129,6 +127,8 @@ class DeleteMessageDialog(QDialog):
         layout.addWidget(subtitle)
 
         buttons = QHBoxLayout()
+        
+        # Кнопка "У меня"
         delete_me = QPushButton("У меня")
         delete_me.clicked.connect(lambda: self._finish("me"))
         delete_me.setStyleSheet(
@@ -136,13 +136,16 @@ class DeleteMessageDialog(QDialog):
         )
         buttons.addWidget(delete_me, 1)
 
-        if self.allow_for_everyone:
-            delete_all = QPushButton("У всех")
-            delete_all.clicked.connect(lambda: self._finish("all"))
-            delete_all.setStyleSheet(
-                f"QPushButton {{ background-color: {self.colors['accent_primary']}; color: white; border: none; border-radius: 14px; padding: 12px; font-weight: 600; }}"
-            )
-            buttons.addWidget(delete_all, 1)
+        # ✅ КНОПКА "У ВСЕХ" ТЕПЕРЬ ВСЕГДА ЗДЕСЬ (независимо от флага)
+        delete_all = QPushButton("У всех")
+        delete_all.clicked.connect(lambda: self._finish("all"))
+        # Делаем кнопку красной для акцента на деструктивном действии
+        error_color = self.colors.get('error', '#EF5A5A')
+        delete_all.setStyleSheet(
+            f"QPushButton {{ background-color: {error_color}; color: white; border: none; border-radius: 14px; padding: 12px; font-weight: 600; }}"
+        )
+        buttons.addWidget(delete_all, 1)
+        
         layout.addLayout(buttons)
 
         cancel = QPushButton("Отмена")
@@ -154,7 +157,6 @@ class DeleteMessageDialog(QDialog):
         self.result_mode = mode
         self.accept()
 
-
 class EditMessageDialog(QDialog):
     def __init__(self, text: str, theme_name: str = "dark", parent=None):
         super().__init__(parent)
@@ -164,6 +166,10 @@ class EditMessageDialog(QDialog):
         self.setModal(True)
         self.setWindowTitle("Изменить сообщение")
         self.resize(380, 190)
+        
+        # Подключаем Enter к сохранению
+        self.input_return_pressed = False
+        
         self.build_ui(text)
 
     def build_ui(self, text: str):
@@ -191,6 +197,8 @@ class EditMessageDialog(QDialog):
             }}
             """
         )
+        # ✅ ГЛАВНОЕ ИЗМЕНЕНИЕ: Подключаем Enter к сохранению
+        self.input.returnPressed.connect(self.accept_value)
         layout.addWidget(self.input)
 
         buttons = QHBoxLayout()

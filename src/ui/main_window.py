@@ -43,8 +43,6 @@ class MainWindow(QMainWindow):
         self.shortcuts_map = self._load_shortcuts()
         self._shortcuts: list[QShortcut] = []
         self._pending_settings = None
-        self.active_nav_index = 0
-        self.nav_buttons = []
         self.init_ui()
         self._bind_shortcuts()
         set_online_status(self.current_user.uid, "online")
@@ -95,7 +93,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(rail)
         layout.setContentsMargins(0, 18, 0, 18)
         layout.setSpacing(14)
-        layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)  # ← ЦЕНТРИРОВАНИЕ ПО ГОРИЗОНТАЛИ
+        layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         
         self.nav_buttons = [
             self._rail_button(self._std_icon("SP_FileDialogContentsView"), active=True),
@@ -104,7 +102,7 @@ class MainWindow(QMainWindow):
         ]
         
         for btn in self.nav_buttons:
-            layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignHCenter)  # ← ЦЕНТРИРОВАНИЕ КАЖДОЙ КНОПКИ
+            layout.addWidget(btn, 0, Qt.AlignmentFlag.AlignHCenter)
         
         layout.addStretch()
         settings_btn = self._rail_button(QIcon("assets/icons/settings.svg"))
@@ -212,6 +210,7 @@ class MainWindow(QMainWindow):
         bottom.setContentsMargins(18, 0, 18, 26)
         bottom.addStretch()
 
+        # ✅ ИСПРАВЛЕНО: Кнопка идеально круглая
         self.new_chat_button = QPushButton()
         self.new_chat_button.setFixedSize(48, 48)
         self.new_chat_button.setIcon(QIcon("assets/icons/plus.svg"))
@@ -223,7 +222,7 @@ class MainWindow(QMainWindow):
                 background-color: {self.colors['accent_primary']};
                 color: #0D0D0D;
                 border: none;
-                border-radius: 999px;
+                border-radius: 999px; /* ЖЕСТКИЙ КРУГ */
             }}
             QPushButton:hover {{
                 background-color: {self.colors['accent_hover']};
@@ -523,14 +522,14 @@ class MainWindow(QMainWindow):
         if not contact_widget:
             return
         
-        # СБРОСИТЬ ВЫДЕЛЕНИЕ СО ВСЕХ ПРЕДЫДУЩИХ ЧАТОВ
+        # Сброс выделения со всех
         for index in range(self.contacts_list.count()):
             prev_item = self.contacts_list.item(index)
             prev_widget = self.contacts_list.itemWidget(prev_item)
             if prev_widget and hasattr(prev_widget, 'set_selected'):
                 prev_widget.set_selected(False)
         
-        # ВЫДЕЛИТЬ ТЕКУЩИЙ ЧАТ
+        # Выделение текущего
         if hasattr(contact_widget, 'set_selected'):
             contact_widget.set_selected(True)
         
