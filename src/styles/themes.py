@@ -29,6 +29,8 @@ from src.styles.colors import (
     TEXT_SECONDARY,
     TEXT_TERTIARY,
     WARNING,
+    MESSAGE_OTHER_TEXT,
+    MESSAGE_OWN_TEXT,
 )
 
 
@@ -52,7 +54,9 @@ class ThemeManager(QObject):
             "text_secondary": TEXT_SECONDARY,
             "text_tertiary": TEXT_TERTIARY,
             "message_own_bg": MESSAGE_OWN_BG,
+            "message_own_text": MESSAGE_OWN_TEXT,
             "message_other_bg": MESSAGE_OTHER_BG,
+            "message_other_text": MESSAGE_OTHER_TEXT,
             "online": ONLINE,
             "offline": OFFLINE,
             "divider": DIVIDER,
@@ -168,7 +172,9 @@ def get_theme_colors(theme_name: str | None = None) -> dict:
     colors.setdefault("accent_primary", ACCENT_PRIMARY)
     colors.setdefault("divider", DIVIDER)
     colors.setdefault("message_own_bg", MESSAGE_OWN_BG)
+    colors.setdefault("message_own_text", MESSAGE_OWN_TEXT)
     colors.setdefault("message_other_bg", MESSAGE_OTHER_BG)
+    colors.setdefault("message_other_text", MESSAGE_OTHER_TEXT)
     colors.setdefault("icon_default", ICON_DEFAULT)
     colors.setdefault("icon_hover", ICON_HOVER)
     colors.setdefault("online", ONLINE)

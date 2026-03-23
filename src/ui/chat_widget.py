@@ -1,13 +1,9 @@
 """Working chat widget for Ten Dem."""
-
 from __future__ import annotations
-
 import os
-
 from PyQt6.QtCore import QEvent, QMimeData, QSize, QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QKeyEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QLabel, QMenu, QMessageBox, QProgressDialog, QPushButton, QScrollArea, QStyle, QTextEdit, QVBoxLayout, QWidget
-
 from src.database.messages_db import (
     QUICK_REACTIONS,
     delete_message as delete_message_record,
@@ -29,10 +25,9 @@ from src.ui.message_bubble import MessageBubble
 from src.ui.photo_viewer_dialog import PhotoViewerDialog
 from src.ui.settings_window import DEFAULT_SHORTCUTS
 
-
 class ChatWidget(QWidget):
     chat_updated = pyqtSignal(str)
-
+    
     def __init__(self, current_user, contact, shortcuts_map: dict | None = None, parent=None):
         super().__init__(parent)
         self.current_user = current_user
@@ -98,8 +93,8 @@ class ChatWidget(QWidget):
             f"""
             QScrollArea {{ border: none; background: {self.colors['bg_secondary']}; border-radius: 28px; }}
             QScrollBar:vertical {{ width: 10px; background: transparent; margin: 8px 6px 8px 0; }}
-            QScrollBar::handle:vertical {{ background: rgba(255,255,255,0.18); border-radius: 999px; min-height: 42px; }}
-            QScrollBar::handle:vertical:hover {{ background: rgba(255,255,255,0.22); }}
+            QScrollBar::handle:vertical {{ background: {'rgba(25,25,28,0.16)' if self.current_user.theme == 'light' else 'rgba(255,255,255,0.18)'}; border-radius: 999px; min-height: 42px; }}
+            QScrollBar::handle:vertical:hover {{ background: {'rgba(25,25,28,0.24)' if self.current_user.theme == 'light' else 'rgba(255,255,255,0.22)'}; }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; background: transparent; border: none; }}
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
             """
@@ -131,8 +126,9 @@ class ChatWidget(QWidget):
     def _create_header(self):
         frame = QFrame()
         frame.setFixedHeight(78)
+        header_bg = "rgba(255, 255, 255, 0.86)" if self.current_user.theme == "light" else "rgba(22, 22, 22, 0.92)"
         frame.setStyleSheet(
-            f"QFrame {{ background-color: rgba(22, 22, 22, 0.96); border: none; border-radius: 28px 28px 0 0; }}"
+            f"QFrame {{ background-color: {header_bg}; border: none; border-radius: 28px 28px 0 0; border-bottom: 1px solid {self.colors['divider']}; }}"
         )
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(20, 0, 20, 0)
@@ -209,7 +205,13 @@ class ChatWidget(QWidget):
     def _create_input_panel(self):
         panel = QFrame()
         panel.setStyleSheet(
-            f"QFrame {{ background-color: {self.colors['bg_secondary']}; border-top: 1px solid {self.colors['divider']}; }}"
+            f"""
+            QFrame {{
+                background-color: {self.colors['bg_secondary']};
+                border-top: 1px solid {self.colors['divider']};
+                border-radius: 0 0 28px 28px;
+            }}
+            """
         )
         layout = QHBoxLayout(panel)
         layout.setContentsMargins(16, 12, 16, 12)
@@ -226,7 +228,7 @@ class ChatWidget(QWidget):
         layout.addWidget(self.attach_btn)
 
         self.input_field = QTextEdit()
-        self.input_field.setMaximumHeight(82)
+        self.input_field.setMaximumHeight(58)
         self.input_field.setPlaceholderText("Написать сообщение")
         self.input_field.installEventFilter(self)
         self.input_field.textChanged.connect(self.on_text_changed)
@@ -236,9 +238,9 @@ class ChatWidget(QWidget):
                 background-color: {self.colors['bg_tertiary']};
                 color: {self.colors['text_primary']};
                 border: none;
-                border-radius: 26px;
-                padding: 12px 16px;
-                font-size: 15px;
+                border-radius: 24px;
+                padding: 10px 16px;
+                font-size: 14px;
                 font-family: {FONT_FAMILY};
             }}
             QScrollBar:vertical {{
@@ -247,12 +249,12 @@ class ChatWidget(QWidget):
                 margin: 8px 6px 8px 0;
             }}
             QScrollBar::handle:vertical {{
-                background: rgba(255,255,255,0.18);
+                background: {'rgba(25,25,28,0.16)' if self.current_user.theme == 'light' else 'rgba(255,255,255,0.18)'};
                 min-height: 28px;
                 border-radius: 999px;
             }}
             QScrollBar::handle:vertical:hover {{
-                background: rgba(255,255,255,0.22);
+                background: {'rgba(25,25,28,0.24)' if self.current_user.theme == 'light' else 'rgba(255,255,255,0.22)'};
             }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 height: 0px;
@@ -262,6 +264,12 @@ class ChatWidget(QWidget):
             }}
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
                 background: transparent;
+            }}
+            QScrollBar::up-arrow, QScrollBar::down-arrow {{
+                width: 0px;
+                height: 0px;
+                background: transparent;
+                border: none;
             }}
             """
         )
@@ -277,15 +285,15 @@ class ChatWidget(QWidget):
         self.send_btn.setStyleSheet(
             f"""
             QPushButton {{
-                background-color: {self.colors['accent_primary']};
-                color: white;
+                background-color: transparent;
+                color: {self.colors['accent_primary']};
                 border: none;
                 border-radius: 999px;
             }}
-            QPushButton:hover {{ background-color: {self.colors['accent_hover']}; }}
+            QPushButton:hover {{ background-color: rgba(68, 148, 74, 0.08); }}
             QPushButton:disabled {{
-                background-color: {self.colors['divider']};
-                color: {self.colors['text_secondary']};
+                background-color: transparent;
+                color: {self.colors['text_tertiary']};
             }}
             """
         )
@@ -369,10 +377,12 @@ class ChatWidget(QWidget):
             message,
             message.from_uid == self.current_user.uid,
             current_user_uid=self.current_user.uid,
+            theme_name=getattr(self.current_user, "theme", "dark"),
             parent=self.messages_container,
         )
         bubble.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         bubble.customContextMenuRequested.connect(lambda pos, msg_id=message.id, widget=bubble: self.show_message_menu(widget, pos, msg_id))
+        bubble.context_menu_requested.connect(lambda pos, msg_id=message.id, widget=bubble: self.show_message_menu(widget, pos, msg_id))
         bubble.clicked.connect(self.on_bubble_clicked)
         bubble.photo_requested.connect(self.open_photo_viewer)
         bubble.reaction_clicked.connect(self.apply_reaction)
@@ -474,7 +484,8 @@ class ChatWidget(QWidget):
         self._add_message_widget(message)
         self.input_field.clear()
         self.clear_reply()
-        self.scroll_to_bottom()
+        # ✅ АВТО-СКРОЛЛ К НОВОМУ СООБЩЕНИЮ
+        QTimer.singleShot(50, self.scroll_to_bottom)
         self.chat_updated.emit(self.contact.uid)
 
     def reply_to_message(self, message: Message):
@@ -501,7 +512,7 @@ class ChatWidget(QWidget):
         self.pinned_label.clear()
 
     def edit_message(self, message: Message):
-        dialog = EditMessageDialog(message.text, self)
+        dialog = EditMessageDialog(message.text, getattr(self.current_user, "theme", "dark"), self)
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
         new_text = dialog.result_text.strip()
@@ -518,7 +529,11 @@ class ChatWidget(QWidget):
         self.chat_updated.emit(self.contact.uid)
 
     def request_delete_message(self, message: Message):
-        dialog = DeleteMessageDialog(allow_for_everyone=message.from_uid == self.current_user.uid, parent=self)
+        dialog = DeleteMessageDialog(
+            allow_for_everyone=message.from_uid == self.current_user.uid,
+            theme_name=getattr(self.current_user, "theme", "dark"),
+            parent=self,
+        )
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
         self.delete_message(message, for_everyone=dialog.result_mode == "all")
@@ -584,7 +599,7 @@ class ChatWidget(QWidget):
         if not users:
             QMessageBox.information(self, "Пересылка", "Пока нет других чатов для пересылки.")
             return
-        dialog = ForwardMessagesDialog(users, self)
+        dialog = ForwardMessagesDialog(users, getattr(self.current_user, "theme", "dark"), self)
         if dialog.exec() != dialog.DialogCode.Accepted or not dialog.selected_uid:
             return
         created = forward_messages(self.current_user.uid, list(self.selected_message_ids), dialog.selected_uid)
@@ -662,7 +677,7 @@ class ChatWidget(QWidget):
         if not media:
             return
         target_index = next((index for index, item in enumerate(media) if item.get("id") == message_id), 0)
-        viewer = PhotoViewerDialog(media, target_index, self)
+        viewer = PhotoViewerDialog(media, target_index, getattr(self.current_user, "theme", "dark"), self)
         viewer.exec()
 
     def _find_message(self, message_id: str) -> Message | None:

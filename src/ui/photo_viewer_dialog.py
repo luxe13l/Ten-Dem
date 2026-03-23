@@ -58,17 +58,19 @@ class PhotoGraphicsView(QGraphicsView):
 
 
 class PhotoViewerDialog(QDialog):
-    def __init__(self, items: list[dict], current_index: int = 0, parent=None):
+    def __init__(self, items: list[dict], current_index: int = 0, theme_name: str = "dark", parent=None):
         super().__init__(parent)
         self.items = items
         self.current_index = current_index
-        self.colors = get_theme_colors()
+        self.theme_name = theme_name or "dark"
+        self.colors = get_theme_colors(self.theme_name)
         self._swipe_start = QPoint()
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         self.setWindowFlag(Qt.WindowType.Dialog, True)
         self.setModal(True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet("background-color: rgba(5, 8, 14, 0.92);")
+        overlay = "rgba(245, 247, 250, 0.74)" if self.theme_name == "light" else "rgba(5, 8, 14, 0.92)"
+        self.setStyleSheet(f"background-color: {overlay};")
         self.build_ui()
         self.load_current()
 
@@ -78,8 +80,9 @@ class PhotoViewerDialog(QDialog):
         root.setSpacing(18)
 
         self.content = QFrame()
+        panel_bg = "#FFFFFF" if self.theme_name == "light" else "#242428"
         self.content.setStyleSheet(
-            "QFrame { background-color: #242428; border-radius: 40px; }"
+            f"QFrame {{ background-color: {panel_bg}; border-radius: 40px; }}"
         )
         root.addWidget(self.content, 1)
 
@@ -129,16 +132,18 @@ class PhotoViewerDialog(QDialog):
     def _action_button(self, text: str) -> QPushButton:
         button = QPushButton(text)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button_bg = "#EEF1F4" if self.theme_name == "light" else "#303036"
+        button_hover = "#E3E8EE" if self.theme_name == "light" else "#3A3A42"
         button.setStyleSheet(
             f"""
             QPushButton {{
-                background-color: #303036;
+                background-color: {button_bg};
                 color: {self.colors['text_primary']};
                 border: none;
                 border-radius: 999px;
                 padding: 10px 14px;
             }}
-            QPushButton:hover {{ background-color: #3A3A42; }}
+            QPushButton:hover {{ background-color: {button_hover}; }}
             """
         )
         return button
@@ -147,17 +152,19 @@ class PhotoViewerDialog(QDialog):
         button = QPushButton(text)
         button.setFixedSize(48, 48)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button_bg = "#EEF1F4" if self.theme_name == "light" else "#303036"
+        button_hover = "#E3E8EE" if self.theme_name == "light" else "#3A3A42"
         button.setStyleSheet(
             f"""
             QPushButton {{
-                background-color: #303036;
+                background-color: {button_bg};
                 color: {self.colors['text_primary']};
                 border: none;
                 border-radius: 999px;
                 font-size: 26px;
                 font-weight: 600;
             }}
-            QPushButton:hover {{ background-color: #3A3A42; }}
+            QPushButton:hover {{ background-color: {button_hover}; }}
             """
         )
         return button

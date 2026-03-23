@@ -1,90 +1,102 @@
-"""
-Виджет аватарки для Ten Dem
-Современный минимализм — дизайн-система v2.0
-"""
-from PyQt6.QtWidgets import QLabel, QWidget, QVBoxLayout
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QPainter, QColor, QBrush, QPen
+"""Theme-aware avatar widget."""
 
-from src.utils.settings import (
-    AVATAR_LIST, AVATAR_CHAT, AVATAR_PROFILE,
-    FONT_FAMILY, ONLINE, BG_TERTIARY, TEXT_PRIMARY
-)
+from __future__ import annotations
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QBrush, QPainter, QPen
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+
+from src.styles import FONT_FAMILY
+from src.styles.themes import get_theme_colors
 
 
 class AvatarWidget(QWidget):
-    """Виджет аватарки пользователя."""
-    
-    def __init__(self, name: str = "", avatar_url: str = "", size: int = 52, parent=None):
+    """Simple circular avatar with optional online indicator."""
+
+    def __init__(self, name: str = "", avatar_url: str = "", size: int = 52, theme_name: str = "dark", parent=None):
         super().__init__(parent)
         self.name = name
         self.avatar_url = avatar_url
         self.size = size
+        self.theme_name = theme_name or "dark"
+        self.colors = get_theme_colors(self.theme_name)
         self.is_online = False
+        self.label: QLabel | None = None
         self.init_ui()
-    
+
     def init_ui(self):
-        """Инициализация интерфейса."""
         self.setFixedSize(self.size, self.size)
-        self.setStyleSheet(f"""
-            QWidget {{
-                background-color: {BG_TERTIARY};
-                border-radius: {self.size // 2}px;
-            }}
-        """)
-        
-        # Layout для аватарки
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self._apply_style()
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        # Если есть URL аватарки — загружаем (пока заглушка)
-        if self.avatar_url:
-            # TODO: Загрузка изображения по URL
-            pass
-        
-        # Буква имени
-        initial = self.get_initial()
-        self.label = QLabel(initial)
+
+        self.label = QLabel(self.get_initial())
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setStyleSheet(f"""
-            color: {TEXT_PRIMARY};
-            font-size: {self.size // 3}px;
-            font-weight: 600;
-            font-family: {FONT_FAMILY};
-        """)
+        self.label.setStyleSheet(
+            f"""
+            QLabel {{
+                background: transparent;
+                color: {self.colors['text_primary']};
+                font-size: {max(14, self.size // 3)}px;
+                font-weight: 600;
+                font-family: {FONT_FAMILY};
+            }}
+            """
+        )
         layout.addWidget(self.label)
-        
-        # Индикатор онлайн (опционально)
-        self.online_indicator = None
-    
+
+    def _apply_style(self):
+        self.colors = get_theme_colors(self.theme_name)
+        self.setStyleSheet(
+            f"""
+            QWidget {{
+                background-color: {self.colors['bg_tertiary']};
+                border-radius: {self.size // 2}px;
+            }}
+            """
+        )
+
+    def set_theme(self, theme_name: str):
+        self.theme_name = theme_name or "dark"
+        self._apply_style()
+        if self.label:
+            self.label.setStyleSheet(
+                f"""
+                QLabel {{
+                    background: transparent;
+                    color: {self.colors['text_primary']};
+                    font-size: {max(14, self.size // 3)}px;
+                    font-weight: 600;
+                    font-family: {FONT_FAMILY};
+                }}
+                """
+            )
+        self.update()
+
     def get_initial(self) -> str:
-        """Получает первую букву имени."""
-        if self.name:
-            return self.name[0].upper()
-        return "?"
-    
+        return self.name[0].upper() if self.name else "?"
+
     def set_online(self, is_online: bool):
-        """Устанавливает статус онлайн."""
         self.is_online = is_online
         self.update()
-    
+
     def paintEvent(self, event):
-        """Рисует индикатор онлайн."""
         super().paintEvent(event)
-        
-        if self.is_online:
-            painter = QPainter(self)
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            
-            # Зелёный кружок в правом нижнем углу
-            indicator_size = self.size // 5
-            painter.setBrush(QBrush(QColor(ONLINE)))
-            painter.setPen(QPen(Qt.PenStyle.NoPen))
-            painter.drawEllipse(
-                self.width() - indicator_size - 2,
-                self.height() - indicator_size - 2,
-                indicator_size,
-                indicator_size
-            )
-            painter.end()
+        if not self.is_online:
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        indicator_size = max(8, self.size // 5)
+        painter.setBrush(QBrush(QColor(self.colors["online"])))
+        painter.setPen(QPen(QColor(self.colors["bg_secondary"]), 2))
+        painter.drawEllipse(
+            self.width() - indicator_size - 2,
+            self.height() - indicator_size - 2,
+            indicator_size,
+            indicator_size,
+        )
+        painter.end()

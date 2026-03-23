@@ -1,7 +1,6 @@
 """
 Система стилей Ten Dem
 Отвечает: [Имя друга]
-
 Импорт всех стилей в одном месте.
 """
 
@@ -23,8 +22,8 @@ from src.styles.components import *
 # ============================================================================
 # ОБРАТНАЯ СОВМЕСТИМОСТЬ (старые названия)
 # ============================================================================
-# Для старых файлов которые ещё не обновили
 
+# Для старых файлов которые ещё не обновили
 COLOR_BACKGROUND = BG_PRIMARY
 COLOR_PANEL = BG_SECONDARY
 COLOR_INPUT_BG = BG_TERTIARY
@@ -39,6 +38,5 @@ COLOR_INPUT_BORDER = INPUT_BORDER
 COLOR_INPUT_BORDER_FOCUS = INPUT_BORDER_FOCUS
 COLOR_MESSAGE_OWN = MESSAGE_OWN_BG
 COLOR_MESSAGE_OTHER = MESSAGE_OTHER_BG
-
 INPUT_BORDER_RADIUS = RADIUS_INPUT
 BUTTON_BORDER_RADIUS = RADIUS_BUTTON

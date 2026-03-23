@@ -1,44 +1,55 @@
 """Contact row widget."""
-
 from __future__ import annotations
-
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
-
 from src.styles import FONT_FAMILY
 from src.styles.themes import get_theme_colors
 from src.ui.avatar_widget import AvatarWidget
 from src.utils.helpers import format_time, truncate
 
-
 class ContactItem(QWidget):
-    def __init__(self, user, last_message="", unread_count=0, timestamp=None, is_pinned=False, parent=None):
+    def __init__(self, user, last_message="", unread_count=0, timestamp=None, is_pinned=False, theme_name="dark", parent=None):
         super().__init__(parent)
         self.user = user
         self.last_message = last_message
         self.unread_count = unread_count
         self.timestamp = timestamp
         self.is_pinned = is_pinned
-        self.colors = get_theme_colors(getattr(self.user, "theme", None))
+        self.theme_name = theme_name or "dark"
+        self.colors = get_theme_colors(self.theme_name)
+        self.is_selected = False  # Выбран ли чат сейчас
         self.unread_badge = None
+        self.pin_icon = None
         self.init_ui()
 
     def init_ui(self):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(14, 12, 14, 12)
-        layout.setSpacing(12)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(14)
 
-        self.avatar = AvatarWidget(self.user.name, self.user.avatar_url)
+        self.avatar = AvatarWidget(self.user.name, self.user.avatar_url, theme_name=self.theme_name)
         layout.addWidget(self.avatar)
 
         info_layout = QVBoxLayout()
         info_layout.setSpacing(4)
 
         top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.setSpacing(8)
+        
+        # ЗНАЧОК СКРЕПКИ ДЛЯ ЗАКРЕПЛЁННОГО ЧАТА
+        if self.is_pinned:
+            self.pin_icon = QLabel()
+            self.pin_icon.setFixedSize(14, 14)
+            self.pin_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.pin_icon.setStyleSheet(f"color: {self.colors['accent_primary']}; font-size: 12px;")
+            self.pin_icon.setText("📌")
+            top_row.addWidget(self.pin_icon)
+        
         self.name_label = QLabel(self.user.name)
-        self.name_label.setFont(QFont(FONT_FAMILY, 14, QFont.Weight.Bold))
+        self.name_label.setFont(QFont(FONT_FAMILY, 13, QFont.Weight.DemiBold))
         top_row.addWidget(self.name_label)
         top_row.addStretch()
 
@@ -47,6 +58,7 @@ class ContactItem(QWidget):
         info_layout.addLayout(top_row)
 
         bottom_row = QHBoxLayout()
+        bottom_row.setContentsMargins(0, 0, 0, 0)
         bottom_row.setSpacing(8)
         self.message_label = QLabel(truncate(self.last_message or "Нет сообщений", 36))
         self.message_label.setWordWrap(True)
@@ -71,13 +83,21 @@ class ContactItem(QWidget):
         self.update_status(self.user.status)
 
     def refresh_style(self):
-        self.colors = get_theme_colors(getattr(self.user, "theme", None))
-        card_bg = "#1E2935" if self.is_pinned else "transparent"
+        self.colors = get_theme_colors(self.theme_name)
+        
+        # ПОДСВЕТКА ВЫБРАННОГО ЧАТА
+        if self.is_selected:
+            card_bg = "rgba(108, 92, 231, 0.15)"  # Фиолетовый полупрозрачный
+        elif self.is_pinned:
+            card_bg = "rgba(68, 148, 74, 0.09)" if self.theme_name != "light" else "rgba(68, 148, 74, 0.10)"
+        else:
+            card_bg = "transparent"
+        
         self.setStyleSheet(
             f"""
             QWidget {{
                 background-color: {card_bg};
-                border-radius: 20px;
+                border-radius: 24px;
             }}
             QLabel {{
                 background-color: transparent;
@@ -86,8 +106,17 @@ class ContactItem(QWidget):
             """
         )
         self.name_label.setStyleSheet(f"color: {self.colors['text_primary']};")
-        self.time_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 11px;")
-        self.message_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 13px;")
+        self.time_label.setStyleSheet(f"color: {self.colors['text_tertiary']}; font-size: 11px;")
+        self.message_label.setStyleSheet(f"color: {self.colors['text_secondary']}; font-size: 12px;")
+        self.avatar.set_theme(self.theme_name)
+        
+        if self.pin_icon:
+            self.pin_icon.setStyleSheet(f"color: {self.colors['accent_primary']}; font-size: 12px;")
+
+    def set_selected(self, selected: bool):
+        """Устанавливает состояние выделения чата"""
+        self.is_selected = selected
+        self.refresh_style()
 
     def update_preview(self, last_message="", timestamp=None, unread_count=0):
         self.last_message = last_message
@@ -109,4 +138,4 @@ class ContactItem(QWidget):
             self.online_dot.hide()
 
     def sizeHint(self):
-        return QSize(300, 76)
+        return QSize(300, 84)

@@ -18,10 +18,11 @@ from src.styles.themes import get_theme_colors
 
 
 class ForwardMessagesDialog(QDialog):
-    def __init__(self, users: list[dict], parent=None):
+    def __init__(self, users: list[dict], theme_name: str = "dark", parent=None):
         super().__init__(parent)
         self.users = users
-        self.colors = get_theme_colors()
+        self.theme_name = theme_name or "dark"
+        self.colors = get_theme_colors(self.theme_name)
         self.selected_uid = ""
         self.setModal(True)
         self.setWindowTitle("Переслать")
@@ -103,10 +104,11 @@ class ForwardMessagesDialog(QDialog):
 
 
 class DeleteMessageDialog(QDialog):
-    def __init__(self, allow_for_everyone: bool, parent=None):
+    def __init__(self, allow_for_everyone: bool, theme_name: str = "dark", parent=None):
         super().__init__(parent)
         self.allow_for_everyone = allow_for_everyone
-        self.colors = get_theme_colors()
+        self.theme_name = theme_name or "dark"
+        self.colors = get_theme_colors(self.theme_name)
         self.result_mode = ""
         self.setModal(True)
         self.setWindowTitle("Удалить сообщение")
@@ -154,9 +156,10 @@ class DeleteMessageDialog(QDialog):
 
 
 class EditMessageDialog(QDialog):
-    def __init__(self, text: str, parent=None):
+    def __init__(self, text: str, theme_name: str = "dark", parent=None):
         super().__init__(parent)
-        self.colors = get_theme_colors()
+        self.theme_name = theme_name or "dark"
+        self.colors = get_theme_colors(self.theme_name)
         self.result_text = ""
         self.setModal(True)
         self.setWindowTitle("Изменить сообщение")

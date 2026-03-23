@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from threading import Thread
 from typing import Any, Callable
 import uuid
@@ -18,6 +18,18 @@ QUICK_REACTIONS = ("❤️", "😂", "😮", "😢", "😡", "👍")
 
 def _now() -> datetime:
     return datetime.now()
+
+
+def _normalize_datetime(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+    return _now().replace(tzinfo=timezone.utc)
+
+
+def _sort_timestamp(value: Any) -> float:
+    return _normalize_datetime(value).timestamp()
 
 
 def _normalize_type(message_type: MessageType | str) -> MessageType:
@@ -255,11 +267,11 @@ def get_messages(user_uid: str, contact_uid: str, limit: int = 50) -> list[dict[
                 item.setdefault("deleted_for", [])
                 merged[item["id"]] = item
             result = list(merged.values())
-            result.sort(key=lambda item: item.get("timestamp") or _now())
+            result.sort(key=lambda item: _sort_timestamp(item.get("timestamp")))
             return result[-limit:]
         except Exception as exc:
             print(f"Ошибка получения сообщений из Firebase: {exc}")
-    local_messages.sort(key=lambda item: item.get("timestamp") or _now())
+    local_messages.sort(key=lambda item: _sort_timestamp(item.get("timestamp")))
     return local_messages[-limit:]
 
 
@@ -271,9 +283,9 @@ def get_chat_summaries(current_uid: str) -> dict[str, dict[str, Any]]:
         if current_uid in message.get("deleted_for", []):
             continue
         contact_uid = message.get("to_uid") if message.get("from_uid") == current_uid else message.get("from_uid")
-        summary = summaries.setdefault(contact_uid, {"last_message": "", "timestamp": datetime.min, "unread_count": 0})
+        summary = summaries.setdefault(contact_uid, {"last_message": "", "timestamp": None, "unread_count": 0})
         timestamp = message.get("timestamp") or _now()
-        if timestamp >= summary["timestamp"]:
+        if summary["timestamp"] is None or _sort_timestamp(timestamp) >= _sort_timestamp(summary["timestamp"]):
             summary["last_message"] = _preview_message(message)
             summary["timestamp"] = timestamp
         if message.get("to_uid") == current_uid and message.get("status") != MessageStatus.READ.value:
@@ -295,7 +307,7 @@ def get_message_by_id(message_id: str) -> dict[str, Any] | None:
 def forward_messages(from_uid: str, selected_ids: list[str], new_to_uid: str) -> list[str]:
     originals = [get_message_by_id(message_id) for message_id in selected_ids]
     originals = [item for item in originals if item]
-    originals.sort(key=lambda item: item.get("timestamp") or _now())
+    originals.sort(key=lambda item: _sort_timestamp(item.get("timestamp")))
     payloads = []
     for original in originals:
         payloads.append(
